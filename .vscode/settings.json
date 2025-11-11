@@ -1,0 +1,27 @@
+{
+    "editor.formatOnSave": true,
+    "files.insertFinalNewline": true,
+    "bazel.buildifierFixOnFormat": true,
+    "bazel.executable": "bazelisk",
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/bazel-bin/",
+        "--all-scopes-completion=true",
+        "--background-index=true",
+        "--clang-tidy",
+        "--completion-style=detailed",
+        "--function-arg-placeholders=1",
+        "--header-insertion=iwyu",
+        "--pch-storage=disk",
+        "--enable-config",
+    ],
+    "cSpell.words": [
+        "bazel",
+        "gtest",
+        "srcs",
+        "googletest",
+        "ggml",
+        "hdrs",
+        "gguf",
+        "NOLINTNEXTLINE",
+    ]
+}

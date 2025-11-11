@@ -1,0 +1,21 @@
+"""
+"""
+module(
+    name = "tiny-llm",
+    version = "0.0.0",
+)
+
+# ========== Start compdb dependency ==========
+bazel_dep(name = "rules_compdb")
+local_path_override(
+    module_name = "rules_compdb",
+    path = "/home/haol/code-dir/bazel-compilation-database",
+)
+compdb_dep = use_extension("@rules_compdb//:extensions.bzl", "compdb_dep")
+use_repo(compdb_dep, "bazel_output_base_util")
+
+bazel_dep(name = "rules_cc", version = "0.2.12-rc2")
+
+bazel_dep(name = "googletest", version = "1.17.0.bcr.1")
+
+bazel_dep(name = "spdlog", version = "1.16.0")

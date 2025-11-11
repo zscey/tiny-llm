@@ -1,0 +1,21 @@
+common --enable_bzlmod=true
+common --enable_workspace=false
+
+build --enable_platform_specific_config
+
+build:linux --cxxopt=-std=c++20
+build:windows --cxxopt=/std:c++20
+# Enable the __cplusplus macro to report the supported standard
+build:windows --cxxopt=/Zc:__cplusplus
+# Use the new conforming preprocessor
+build:windows --copt=/Zc:preprocessor
+
+build:tsan --copt=-fsanitize=thread
+build:tsan --linkopt=-fsanitize=thread
+build:asan --copt=-fsanitize=address
+build:asan --linkopt=-fsanitize=address
+
+build:cuda --@rules_cuda//cuda:enable=True
+build:cuda --@rules_cuda//cuda:archs="sm_89"
+build:cuda --@rules_cuda//cuda:compiler="nvcc"
+# build --config cuda
