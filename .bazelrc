@@ -18,4 +18,6 @@ build:asan --linkopt=-fsanitize=address
 build:cuda --@rules_cuda//cuda:enable=True
 build:cuda --@rules_cuda//cuda:archs="sm_89"
 build:cuda --@rules_cuda//cuda:compiler="nvcc"
-# build --config cuda
+build --config cuda
+
+build --platforms=@tiny_llm//platforms:host_platform

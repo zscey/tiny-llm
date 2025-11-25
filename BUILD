@@ -6,6 +6,6 @@ compilation_database(
     testonly = True,
     output_base = OUTPUT_BASE,
     targets = [
-        "//tests:examples_group",
+        "//tests:tests",
     ],
 )

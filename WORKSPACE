@@ -1,1 +1,1 @@
-workspace(name = "tiny-llm")
+workspace(name = "tiny_llm")
