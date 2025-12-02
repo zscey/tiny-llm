@@ -2,6 +2,24 @@
 #include "tiny_llm/common/log_and_excepts.hpp"
 
 namespace tiny_llm {
+namespace {
+class CpuDeleter : public IDeleter {
+public:
+  CpuDeleter() = default;
+
+  TINY_LLM_DELETE_COPY_MOVE(CpuDeleter);
+
+  ~CpuDeleter() override = default;
+
+  void cleanup(void *ptr) override {
+    if (ptr != nullptr) {
+      // NOLINTNEXTLINE(hicpp-no-malloc,cppcoreguidelines-owning-memory,cppcoreguidelines-no-malloc)
+      std::free(ptr);
+    }
+  }
+};
+} // namespace
+
 auto CpuAllocator::Allocate(size_t size, size_t alignment) -> Buffer {
   // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
   auto *ptr = std::aligned_alloc(alignment, size);
@@ -10,13 +28,6 @@ auto CpuAllocator::Allocate(size_t size, size_t alignment) -> Buffer {
   return {ptr,
           size,
           {.type = DeviceType::kCpu, .id = -1},
-          CpuAllocator::DefaultDeleter};
-}
-
-void CpuAllocator::DefaultDeleter(void *ptr) {
-  if (ptr != nullptr) {
-    // NOLINTNEXTLINE(hicpp-no-malloc,cppcoreguidelines-owning-memory,cppcoreguidelines-no-malloc)
-    std::free(ptr);
-  }
+          std::make_unique<CpuDeleter>()};
 }
 } // namespace tiny_llm

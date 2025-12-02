@@ -2,7 +2,12 @@
 #include "gtest/gtest.h"
 #include <cstdint>
 
+namespace tiny_llm {
 TEST(DeviceManager, CpuAllocator) {
-  auto buffer = tiny_llm::CpuAllocator::Allocate(321, 1024);
+  auto buffer = CpuAllocator::Allocate(2048, 1024);
   EXPECT_TRUE(reinterpret_cast<std::uintptr_t>(buffer.get_ptr()) % 1024 == 0);
+  EXPECT_TRUE(buffer.get_size() == 2048);
+  EXPECT_TRUE(buffer.get_device().type == DeviceType::kCpu);
+  EXPECT_TRUE(buffer.get_device().id == -1);
 }
+} // namespace tiny_llm

@@ -20,3 +20,12 @@
     spdlog::error("[{}: {}]: {}", __FILE__, __LINE__, err_msg);                \
     throw std::runtime_error(err_msg);                                         \
   }
+
+#define TINY_LLM_CUDA_WARN(expr)                                               \
+  if ((expr) != cudaSuccess) {                                                 \
+    auto status = cudaGetLastError();                                          \
+    auto err_msg =                                                             \
+        fmt::format("Cuda error [{}]: {}.", cudaGetErrorName(status),          \
+                    cudaGetErrorString(status));                               \
+    spdlog::warn("[{}: {}]: {}", __FILE__, __LINE__, err_msg);                 \
+  }

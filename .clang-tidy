@@ -24,6 +24,10 @@ Checks:
   - '-misc-include-cleaner'
   # enable pointer arithmetic
   - '-cppcoreguidelines-pro-bounds-pointer-arithmetic'
+  # for use c style array
+  - '-hicpp-avoid-c-arrays'
+  - '-cppcoreguidelines-avoid-c-arrays'
+  - '-modernize-avoid-c-arrays'
 
 WarningsAsErrors: '*'
 CheckOptions:

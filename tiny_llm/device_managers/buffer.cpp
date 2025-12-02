@@ -1,8 +1,9 @@
 #include "tiny_llm/device_managers/buffer.hpp"
 
 namespace tiny_llm {
-Buffer::Buffer(void *ptr, std::size_t size, Device device, DeleterPtr deleter)
-    : ptr_(ptr), size_(size), device_(device), deleter_(deleter) {}
+Buffer::Buffer(void *ptr, std::size_t size, Device device,
+               std::unique_ptr<IDeleter> deleter)
+    : ptr_(ptr), size_(size), device_(device), deleter_(std::move(deleter)) {}
 
 Buffer::Buffer(Buffer &&other) noexcept {
   std::swap(ptr_, other.ptr_);
@@ -22,8 +23,8 @@ auto Buffer::operator=(Buffer &&other) noexcept -> Buffer & {
 }
 
 Buffer::~Buffer() noexcept {
-  if (deleter_ != nullptr) {
-    deleter_(ptr_);
+  if (deleter_) {
+    deleter_->cleanup(ptr_);
   }
 }
 } // namespace tiny_llm
