@@ -1,5 +1,5 @@
 #include "cuda_runtime.h"
-#include "tiny_llm/device_managers/cuda_context.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include "gtest/gtest.h"
 
 namespace tiny_llm {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "tiny_llm/common/common_macros.hpp"
-#include "tiny_llm/device_managers/cuda_context.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include <cstdint>
 
 namespace tiny_llm {

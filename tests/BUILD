@@ -8,18 +8,18 @@ cc_test(
         "examples/test_group.cpp",
         "main_gtest.cpp",
     ] + glob([
-        "device_managers/test_cpu*",
+        "device_managers/cpu/*",
     ]) + select({
-        "//platforms/device:cuda": glob(["device_managers/test_cuda*"]),
+        "//platforms/device:cuda": glob(["device_managers/cuda/*"]),
         "//conditions:default": [],
     }),
     deps = [
         "//tiny_llm/common:log_and_excepts",
-        "//tiny_llm/device_managers:cpu_allocator",
+        "//tiny_llm/device_managers/cpu:cpu_allocator",
         "@googletest//:gtest",
         "@spdlog",
     ] + select({
-        "//platforms/device:cuda": ["//tiny_llm/device_managers:cuda_allocator"],
+        "//platforms/device:cuda": ["//tiny_llm/device_managers/cuda:cuda_allocator"],
         "//conditions:default": [],
     }),
 )

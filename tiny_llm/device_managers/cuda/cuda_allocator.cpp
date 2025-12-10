@@ -1,8 +1,7 @@
-#include "tiny_llm/device_managers/cuda_allocator.hpp"
-#include "buffer.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
-#include "tiny_llm/device_managers/cuda_context.hpp"
-#include "tiny_llm/device_managers/cuda_guards.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_guards.hpp"
 
 namespace tiny_llm {
 namespace {

@@ -1,4 +1,4 @@
-#include "tiny_llm/device_managers/cpu_allocator.hpp"
+#include "tiny_llm/device_managers/cpu/cpu_allocator.hpp"
 #include "gtest/gtest.h"
 #include <cstdint>
 

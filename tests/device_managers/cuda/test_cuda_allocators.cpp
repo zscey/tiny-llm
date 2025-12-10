@@ -1,4 +1,4 @@
-#include "tiny_llm/device_managers/cuda_allocator.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
 #include "gtest/gtest.h"
 #include <cstdint>
 
