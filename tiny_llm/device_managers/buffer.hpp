@@ -52,8 +52,6 @@ public:
 
   ~Buffer() noexcept;
 
-  auto get_ptr() -> void * { return ptr_; }
-
   [[nodiscard]] auto get_ptr() const -> const void * { return ptr_; }
 
   [[nodiscard]] auto get_size() const -> std::size_t { return size_; }
