@@ -9,13 +9,19 @@ cc_test(
         "main_gtest.cpp",
     ] + glob([
         "device_managers/cpu/*",
+        "tensor/*",
     ]) + select({
         "//platforms/device:cuda": glob(["device_managers/cuda/*"]),
+        "//conditions:default": [],
+    }),
+    local_defines = select({
+        "//platforms/device:cuda": ["TESTS_WITH_CUDA"],
         "//conditions:default": [],
     }),
     deps = [
         "//tiny_llm/common:log_and_excepts",
         "//tiny_llm/device_managers/cpu:cpu_allocator",
+        "//tiny_llm/tensor",
         "@googletest//:gtest",
         "@spdlog",
     ] + select({

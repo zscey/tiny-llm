@@ -27,7 +27,7 @@ auto CpuAllocator::Allocate(size_t size, size_t alignment) -> Buffer {
 
   return {ptr,
           size,
-          {.type = DeviceType::kCpu, .id = -1},
+          {.type = DeviceType::kCpu, .id = 0},
           std::make_unique<CpuDeleter>()};
 }
 } // namespace tiny_llm

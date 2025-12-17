@@ -61,7 +61,7 @@ auto CudaHostAllocator::Allocate(std::size_t size) -> Buffer {
 
   return {ptr,
           size,
-          {.type = DeviceType::kCudaHost, .id = -1},
+          {.type = DeviceType::kCudaHost, .id = 0},
           std::make_unique<CudaHostDeleter>()};
 }
 } // namespace tiny_llm
