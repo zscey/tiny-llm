@@ -6,17 +6,20 @@ namespace tiny_llm {
 TEST(DeviceManager, CudaGuards) {
   CudaDeviceSwitchGuard switch_guard(0);
 
-  auto context = CudaContextAllocator::CreateCudaContext();
+  auto context_1 = CudaContextAllocator::CreateCudaContext();
+  ThreadCudaContextsGuard context_guard(context_1);
+
+  auto context_2 = CudaContextAllocator::CreateCudaContext();
   {
-    ThreadCudaContextsGuard context_guard(context);
+    ThreadCudaContextsGuard context_guard(context_2);
     auto cur_context = ThreadCudaContexts::GetContext();
 
-    EXPECT_TRUE(cur_context.id == context.id);
-    EXPECT_TRUE(cur_context.stream == context.stream);
+    EXPECT_TRUE(cur_context.id == context_2.id);
+    EXPECT_TRUE(cur_context.stream == context_2.stream);
   }
 
   auto cur_context = ThreadCudaContexts::GetContext();
 
-  EXPECT_TRUE(cur_context.stream != context.stream);
+  EXPECT_TRUE(cur_context.stream == context_1.stream);
 }
 } // namespace tiny_llm

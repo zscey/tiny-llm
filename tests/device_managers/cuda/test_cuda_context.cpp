@@ -9,7 +9,8 @@ TEST(DeviceManager, CudaContext) {
   ThreadCudaContexts::Push(CudaContextAllocator::CreateCudaContext());
   auto context1 = ThreadCudaContexts::GetContext();
 
-  EXPECT_TRUE(context0.stream != context1.stream);
+  EXPECT_TRUE(context0.stream != nullptr);
+  EXPECT_TRUE(context1.stream != nullptr);
   EXPECT_TRUE(context0.id == context1.id);
 
   for (size_t i = 0; i < 100; ++i) {

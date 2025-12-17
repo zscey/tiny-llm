@@ -8,6 +8,7 @@
 namespace tiny_llm {
 enum class DeviceType : std::uint8_t {
   kCpu,
+  kCudaHost,
   kCuda,
 };
 

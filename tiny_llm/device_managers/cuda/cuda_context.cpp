@@ -99,7 +99,7 @@ void ThreadCudaContexts::Pop() {
 auto ThreadCudaContexts::GetContext() -> CudaContext {
   auto &thread_cuda_contexts = ThreadInstance();
   if (thread_cuda_contexts.contexts_.empty()) {
-    ThreadCudaContexts::Push(CudaContextAllocator::CreateCudaContext());
+    throw std::runtime_error("Emtpy cuda context.");
   }
   return thread_cuda_contexts.contexts_.top();
 }
