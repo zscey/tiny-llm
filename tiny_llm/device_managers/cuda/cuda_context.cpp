@@ -80,35 +80,58 @@ auto CudaContextAllocator::CreateCudaContext() -> CudaContext {
 }
 
 // ========================== ThreadCudaContexts ==========================
+class ThreadCudaContexts::Impl {
+public:
+  std::array<std::stack<CudaContext>, MAX_CUDA_DEVICE_NUM> contexts{};
+};
+
+ThreadCudaContexts::ThreadCudaContexts() : impl_(std::make_unique<Impl>()) {};
+
 auto ThreadCudaContexts::ThreadInstance() -> ThreadCudaContexts & {
   thread_local static ThreadCudaContexts thread_cuda_contexts;
   return thread_cuda_contexts;
 }
 
 void ThreadCudaContexts::Push(CudaContext cuda_context) {
-  ThreadInstance().contexts_.push(cuda_context);
+  int32_t dev_id{};
+  TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+  TINY_LLM_CHECK(dev_id == cuda_context.id);
+
+  ThreadInstance().impl_->contexts.at(cuda_context.id).push(cuda_context);
 }
 
 void ThreadCudaContexts::Pop() {
   auto &thread_cuda_contexts = ThreadInstance();
-  if (!thread_cuda_contexts.contexts_.empty()) {
-    thread_cuda_contexts.contexts_.pop();
+
+  int32_t dev_id{};
+  TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+  auto &cur_contexts = thread_cuda_contexts.impl_->contexts.at(dev_id);
+  if (!cur_contexts.empty()) {
+    cur_contexts.pop();
   }
 }
 
 auto ThreadCudaContexts::GetContext() -> CudaContext {
   auto &thread_cuda_contexts = ThreadInstance();
-  if (thread_cuda_contexts.contexts_.empty()) {
-    throw std::runtime_error("Emtpy cuda context.");
+
+  int32_t dev_id{};
+  TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+  auto &cur_contexts = thread_cuda_contexts.impl_->contexts.at(dev_id);
+  if (cur_contexts.empty()) {
+    cur_contexts.push(CudaContextAllocator::CreateCudaContext());
   }
-  return thread_cuda_contexts.contexts_.top();
+
+  return cur_contexts.top();
 }
 
 void ThreadCudaContexts::Synchronize() {
   auto &thread_cuda_contexts = ThreadInstance();
-  if (!thread_cuda_contexts.contexts_.empty()) {
-    TINY_LLM_CUDA_CHECK(
-        cudaStreamSynchronize(ThreadInstance().contexts_.top().stream));
+
+  int32_t dev_id{};
+  TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+  auto &cur_contexts = thread_cuda_contexts.impl_->contexts.at(dev_id);
+  if (!cur_contexts.empty()) {
+    TINY_LLM_CUDA_CHECK(cudaStreamSynchronize(cur_contexts.top().stream));
   }
 }
 

@@ -12,6 +12,8 @@ enum class DeviceType : std::uint8_t {
   kCuda,
 };
 
+auto to_string(DeviceType dev_type) -> std::string;
+
 using DeviceId = std::int8_t;
 
 struct Device {

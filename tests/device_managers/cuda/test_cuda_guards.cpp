@@ -20,6 +20,7 @@ TEST(DeviceManager, CudaGuards) {
 
   auto cur_context = ThreadCudaContexts::GetContext();
 
+  EXPECT_TRUE(cur_context.id == context_1.id);
   EXPECT_TRUE(cur_context.stream == context_1.stream);
 }
 } // namespace tiny_llm

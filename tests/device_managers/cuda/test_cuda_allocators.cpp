@@ -1,5 +1,4 @@
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
-#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_guards.hpp"
 #include "gtest/gtest.h"
 #include <cstdint>
@@ -12,8 +11,6 @@ TEST(DeviceManager, CudaAllocator) {
   EXPECT_TRUE(host_buffer.get_device().id == 0);
 
   CudaDeviceSwitchGuard dev_guard(0);
-  ThreadCudaContextsGuard context_guard(
-      CudaContextAllocator::CreateCudaContext());
 
   auto buffer = CudaAllocator::Allocate(1024);
   EXPECT_TRUE(buffer.get_size() == 1024);

@@ -1,46 +1,60 @@
 #include "tiny_llm/tensor/tensor.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/device_managers/cpu/cpu_allocator.hpp"
-#include <stdexcept>
 
 #ifdef TENSOR_WITH_CUDA
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_guards.hpp"
 #endif
 
 namespace tiny_llm {
 namespace {
-auto allocate_buffer(DeviceType dev_type, size_t size, size_t alignment = 64)
+auto allocate_buffer(Device device, size_t size, size_t alignment = 64)
     -> std::shared_ptr<Buffer> {
-  switch (dev_type) {
+  switch (device.type) {
   case DeviceType::kCpu:
     return std::make_shared<Buffer>(CpuAllocator::Allocate(size, alignment));
 #ifdef TENSOR_WITH_CUDA
   case DeviceType::kCudaHost:
     return std::make_shared<Buffer>(CudaHostAllocator::Allocate(size));
-  case DeviceType::kCuda:
+  case DeviceType::kCuda: {
+    CudaDeviceSwitchGuard guard(device.id);
     return std::make_shared<Buffer>(CudaAllocator::Allocate(size));
+  }
 #endif
   default:
     break;
   }
 
-  throw std::runtime_error("Unsupported device type.");
+  throw std::runtime_error(fmt::format("Unsupported device: ({}, {}).",
+                                       to_string(device.type), device.id));
 }
 } // namespace
+
+auto to_string(DataType dtype) -> std::string {
+  switch (dtype) {
+  case DataType::kFloat32:
+    return "Float32";
+  default:
+    return "Unknow";
+  }
+}
+
 auto type_size(DataType dtype) -> size_t {
   switch (dtype) {
-  case DataType::kFloat:
+  case DataType::kFloat32:
     return 4;
   default:
     break;
   }
 
-  throw std::runtime_error("Unsupported data type.");
+  throw std::runtime_error(
+      fmt::format("Unsupported data type: {}.", to_string(dtype)));
 }
 
-Tensor::Tensor(DeviceType dev_type, DataType dtype, std::vector<int64_t> shape,
+Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
                bool pre_allocate)
-    : dev_type_(dev_type), dtype_(dtype), shape_(std::move(shape)), offset_(0) {
+    : device_(device), dtype_(dtype), shape_(std::move(shape)), offset_(0) {
   TINY_LLM_CHECK(shape_.size() >= 1);
 
   stride_ = std::vector<int64_t>(shape_.size(),
@@ -50,14 +64,14 @@ Tensor::Tensor(DeviceType dev_type, DataType dtype, std::vector<int64_t> shape,
   }
 
   if (pre_allocate) {
-    buffer_ = allocate_buffer(dev_type_, stride_[0] * shape_[0]);
+    buffer_ = allocate_buffer(device_, stride_[0] * shape_[0]);
   }
 }
 
-Tensor::Tensor(DeviceType dev_type, DataType dtype, std::vector<int64_t> shape,
+Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
                std::vector<int64_t> stride, size_t offset,
                std::shared_ptr<Buffer> buffer)
-    : dev_type_(dev_type), dtype_(dtype), shape_(std::move(shape)),
+    : device_(device), dtype_(dtype), shape_(std::move(shape)),
       stride_(std::move(stride)), offset_(offset), buffer_(std::move(buffer)) {
   TINY_LLM_CHECK(buffer_ != nullptr);
   TINY_LLM_CHECK(shape_.size() == stride_.size());
@@ -68,19 +82,15 @@ Tensor::Tensor(DeviceType dev_type, DataType dtype, std::vector<int64_t> shape,
     shape_cum *= shape_[d];
   }
 
-  TINY_LLM_CHECK(dev_type_ == buffer_->get_device().type);
+  TINY_LLM_CHECK(device_.type == buffer_->get_device().type);
+  TINY_LLM_CHECK(device_.id == buffer_->get_device().id);
 
   TINY_LLM_CHECK(offset + (shape_[0] * stride_[0]) <= buffer_->get_size());
 }
 
-auto Tensor::device() const -> Device {
-  return {.type = dev_type_,
-          .id = buffer_ ? buffer_->get_device().id : static_cast<DeviceId>(-1)};
-}
-
 auto Tensor::data() -> void * {
   if (!buffer_) {
-    buffer_ = allocate_buffer(dev_type_, stride_[0] * shape_[0]);
+    buffer_ = allocate_buffer(device_, stride_[0] * shape_[0]);
   }
   return static_cast<uint8_t *>(buffer_->get_ptr()) + offset_;
 }

@@ -54,10 +54,12 @@ public:
   static void SynchronizeDevice();
 
 private:
-  ThreadCudaContexts() = default;
+  ThreadCudaContexts();
 
   static auto ThreadInstance() -> ThreadCudaContexts &;
 
-  std::stack<CudaContext> contexts_;
+  class Impl;
+
+  std::unique_ptr<Impl> impl_;
 };
 } // namespace tiny_llm

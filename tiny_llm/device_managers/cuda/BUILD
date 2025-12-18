@@ -7,7 +7,7 @@ cc_library(
     srcs = ["cuda_context.cpp"],
     hdrs = ["cuda_context.hpp"],
     local_defines = [
-        "CUDA_STREAM_POOL_SIZE=5",
+        "CUDA_STREAM_POOL_SIZE=32",
         "MAX_CUDA_DEVICE_NUM=8",
     ],
     deps = [

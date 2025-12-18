@@ -1,6 +1,19 @@
 #include "tiny_llm/device_managers/buffer.hpp"
 
 namespace tiny_llm {
+auto to_string(DeviceType dev_type) -> std::string {
+  switch (dev_type) {
+  case DeviceType::kCpu:
+    return "Cpu";
+  case DeviceType::kCudaHost:
+    return "CudaHost";
+  case tiny_llm::DeviceType::kCuda:
+    return "Cuda";
+  default:
+    return "Unknow";
+  }
+}
+
 Buffer::Buffer(void *ptr, std::size_t size, Device device,
                std::unique_ptr<IDeleter> deleter)
     : ptr_(ptr), size_(size), device_(device), deleter_(std::move(deleter)) {}

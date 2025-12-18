@@ -16,7 +16,7 @@ TEST(DeviceManager, CudaContext) {
   for (size_t i = 0; i < 100; ++i) {
     ThreadCudaContexts::Push(CudaContextAllocator::CreateCudaContext());
     ThreadCudaContexts::Synchronize();
-    ThreadCudaContexts::Synchronize();
+    ThreadCudaContexts::SynchronizeDevice();
   }
 
   for (size_t i = 0; i < 200; ++i) {

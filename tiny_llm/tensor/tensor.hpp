@@ -4,17 +4,19 @@
 
 namespace tiny_llm {
 enum class DataType : std::uint8_t {
-  kFloat,
+  kFloat32,
 };
+
+auto to_string(DataType dtype) -> std::string;
 
 auto type_size(DataType dtype) -> size_t;
 
 class Tensor {
 public:
-  Tensor(DeviceType dev_type, DataType dtype, std::vector<int64_t> shape,
+  Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
          bool pre_allocate = false);
 
-  Tensor(DeviceType dev_type, DataType dtype, std::vector<int64_t> shape,
+  Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
          std::vector<int64_t> stride, size_t offset,
          std::shared_ptr<Buffer> buffer);
 
@@ -28,7 +30,7 @@ public:
 
   [[nodiscard]] auto dtype() const -> DataType { return dtype_; }
 
-  [[nodiscard]] auto device() const -> Device;
+  [[nodiscard]] auto device() const -> Device { return device_; }
 
   auto data() -> void *;
 
@@ -41,7 +43,7 @@ public:
   }
 
 private:
-  DeviceType dev_type_;
+  Device device_;
   DataType dtype_;
   std::vector<int64_t> shape_;
   std::vector<int64_t> stride_;
