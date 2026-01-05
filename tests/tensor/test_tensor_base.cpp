@@ -31,18 +31,17 @@ TYPED_TEST_SUITE(TensorBaseTest, TestTypes);
 
 TYPED_TEST(TensorBaseTest, TensorBaseApi) {
   {
-    const auto &tensor = this->tensor;
-    const void *ptr{};
-    EXPECT_ANY_THROW((ptr = tensor.data()));
+    const auto &const_tensor = this->tensor;
+    EXPECT_ANY_THROW((void)const_tensor.data());
   }
   EXPECT_NO_THROW(this->tensor.data());
   EXPECT_TRUE(this->tensor.template data<float>() != nullptr);
-  EXPECT_NO_THROW(this->tensor.device().type == this->device.type);
-  EXPECT_NO_THROW(this->tensor.device().id == this->device.id);
+  EXPECT_EQ(this->tensor.device().type, this->device.type);
+  EXPECT_EQ(this->tensor.device().id, this->device.id);
   {
-    const auto &tensor = this->tensor;
-    EXPECT_NO_THROW(tensor.data());
-    EXPECT_TRUE(tensor.data() != nullptr);
+    const auto &const_tensor = this->tensor;
+    const auto *ptr = const_tensor.data();
+    EXPECT_TRUE(ptr != nullptr);
   }
 
   {
@@ -52,9 +51,8 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
                {size * 60, size * 20, size * 5, size}, 20,
                std::make_shared<Buffer>(this->tensor.data(), 1440,
                                         this->tensor.device()));
-    const void *ptr{};
-    EXPECT_NO_THROW((ptr = tensor.data()));
-    EXPECT_TRUE(tensor.data() != nullptr);
+    const auto *ptr = tensor.data();
+    EXPECT_TRUE(ptr != nullptr);
   }
 
   auto size = static_cast<int64_t>(type_size(this->tensor.dtype()));
