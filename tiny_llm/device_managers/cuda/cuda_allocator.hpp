@@ -5,7 +5,7 @@
 namespace tiny_llm {
 class CudaAllocator {
 public:
-  /// @brief Allocate the ptr on current device.
+  /// @brief Allocate the Buffer on the current device.
   static auto Allocate(std::size_t size) -> Buffer;
 };
 

@@ -11,6 +11,9 @@
     throw std::runtime_error(err_msg);                                         \
   }
 
+#define TINY_LLM_THROW_ERROR(exception_type, ...)                              \
+  throw exception_type(fmt::format(__VA_ARGS__))
+
 #define TINY_LLM_CUDA_CHECK(expr)                                              \
   if ((expr) != cudaSuccess) {                                                 \
     auto status = cudaGetLastError();                                          \

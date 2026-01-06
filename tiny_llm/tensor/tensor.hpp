@@ -13,7 +13,7 @@ auto type_size(DataType dtype) -> size_t;
 
 class Tensor {
 public:
-  Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
+  Tensor(Device device, DataType dtype, std::vector<int64_t> shape = {},
          bool pre_allocate = false);
 
   Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
