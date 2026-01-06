@@ -26,7 +26,8 @@ using TestTypes = ::testing::Types<
     Types<{.type = DeviceType::kCudaHost, .id = 0}, DataType::kFloat32>,
     Types<{.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32>>;
 #else
-using TestTypes = ::testing::Types<Types<DeviceType::kCpu, DataType::kFloat>>;
+using TestTypes = ::testing::Types<
+    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32>>;
 #endif
 
 TYPED_TEST_SUITE(TensorBaseTest, TestTypes);
