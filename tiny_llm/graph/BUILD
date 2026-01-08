@@ -17,3 +17,10 @@ cc_library(
         "//tiny_llm/tensor",
     ],
 )
+
+cc_library(
+    name = "graph_optimizer",
+    srcs = ["graph_optimizer.cpp"],
+    hdrs = ["graph_optimizer.hpp"],
+    deps = [":graph"],
+)

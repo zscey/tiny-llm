@@ -22,7 +22,7 @@ cc_test(
     deps = [
         "//tiny_llm/common:log_and_excepts",
         "//tiny_llm/device_managers/cpu:cpu_allocator",
-        "//tiny_llm/graph",
+        "//tiny_llm/graph:graph_optimizer",
         "//tiny_llm/tensor",
         "@googletest//:gtest",
         "@spdlog",

@@ -3,6 +3,7 @@
     "files.insertFinalNewline": true,
     "bazel.buildifierFixOnFormat": true,
     "bazel.executable": "bazelisk",
+    "C_Cpp.intelliSenseEngine": "disabled",
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}/bazel-bin/",
         "--all-scopes-completion=true",
