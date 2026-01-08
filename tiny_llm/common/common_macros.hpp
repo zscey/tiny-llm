@@ -6,8 +6,7 @@
   auto operator=(const ClassName &)->ClassName & = delete;                     \
   auto operator=(ClassName &&)->ClassName & = delete;
 
-#define TINY_LLM_DEFAULT_CONSTRUCTOR_AND_ASSIGNMENT(ClassName)                 \
-  ClassName() = default;                                                       \
+#define TINY_LLM_DEFAULT_COPY_MOVE(ClassName)                                  \
   ClassName(const ClassName &) = default;                                      \
   ClassName(ClassName &&) = default;                                           \
   auto operator=(const ClassName &)->ClassName & = default;                    \

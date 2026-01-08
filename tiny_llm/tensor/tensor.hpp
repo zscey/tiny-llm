@@ -1,3 +1,5 @@
+#pragma once
+
 #include "tiny_llm/device_managers/buffer.hpp"
 #include <memory>
 #include <vector>

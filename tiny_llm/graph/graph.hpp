@@ -10,7 +10,7 @@
 namespace tiny_llm {
 class TensorInfo {
 public:
-  bool is_initialized{false};
+  bool has_explicit_added{false};
   DataType dtype;
   std::vector<int64_t> shape;
   std::vector<uint32_t> consumer_nodes;
@@ -32,8 +32,8 @@ public:
 
 class Graph {
 public:
-  std::vector<std::optional<Node>> nodes;
-  std::vector<std::optional<TensorInfo>> tensor_infos;
+  std::vector<std::optional<std::pair<std::string, Node>>> nodes;
+  std::vector<std::optional<std::pair<std::string, TensorInfo>>> tensor_infos;
 
   std::unordered_map<std::string, uint32_t> node_name_to_idx;
   std::unordered_map<std::string, uint32_t> tensor_name_to_idx;
@@ -48,4 +48,6 @@ public:
   void set_input_names(std::vector<std::string> input_names);
   void set_output_names(std::vector<std::string> output_names);
 };
+
+auto is_valid(const Graph &g) -> bool;
 } // namespace tiny_llm
