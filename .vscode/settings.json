@@ -24,6 +24,8 @@
         "hdrs",
         "gguf",
         "NOLINTNEXTLINE",
-        "cuda"
+        "cuda",
+        "safetensors",
+        "safetensor"
     ]
 }

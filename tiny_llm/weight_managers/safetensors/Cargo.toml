@@ -1,0 +1,12 @@
+[package]
+name = "safetensors_ffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+
+[dependencies]
+safetensors = "0.7.0"
+memmap2 = "0.9.9"

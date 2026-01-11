@@ -11,10 +11,12 @@ cc_test(
         "device_managers/cpu/*",
         "graph/*",
         "tensor/*",
+        "weight_managers/*",
     ]) + select({
         "//platforms/device:cuda": glob(["device_managers/cuda/*"]),
         "//conditions:default": [],
     }),
+    data = ["//tests/datas"],
     local_defines = select({
         "//platforms/device:cuda": ["TESTS_WITH_CUDA"],
         "//conditions:default": [],
@@ -24,6 +26,8 @@ cc_test(
         "//tiny_llm/device_managers/cpu:cpu_allocator",
         "//tiny_llm/graph:graph_optimizer",
         "//tiny_llm/tensor",
+        "//tiny_llm/utils:runfile",
+        "//tiny_llm/weight_managers/safetensors:weight_manager",
         "@googletest//:gtest",
         "@spdlog",
     ] + select({
