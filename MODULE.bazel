@@ -32,3 +32,13 @@ bazel_dep(name = "platforms", version = "1.0.0")
 
 host_platform = use_extension("//:tools/gen_platforms.bzl", "host_platform")
 use_repo(host_platform, "host_platform")
+
+bazel_dep(name = "rules_rust", version = "0.68.1")
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "safetensors_deps",
+    cargo_lockfile = "//tiny_llm/weight_managers/safetensors:Cargo.lock",
+    lockfile = "//tiny_llm/weight_managers/safetensors:Cargo.Bazel.lock",
+    manifests = ["//tiny_llm/weight_managers/safetensors:Cargo.toml"],
+)
+use_repo(crate, "safetensors_deps")

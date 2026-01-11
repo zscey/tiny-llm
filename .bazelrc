@@ -20,4 +20,4 @@ build:cuda --@rules_cuda//cuda:archs="sm_89"
 build:cuda --@rules_cuda//cuda:compiler="nvcc"
 build --config cuda
 
-build --platforms=@tiny_llm//platforms:host_platform
+build --platforms=//platforms:host_platform
