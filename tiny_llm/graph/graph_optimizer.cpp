@@ -106,7 +106,7 @@ void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
 }
 } // namespace
 
-void PruningPass::run(Graph &g) {
+void PruningPass::run(Graph &g, WeightManagerWrapper & /*w*/) {
   (void)(this);
 
   std::set<uint32_t> output_nodes;
@@ -148,4 +148,6 @@ void PruningPass::run(Graph &g) {
   shrink(g, retain_nodes);
   TINY_LLM_CHECK(is_valid(g));
 }
+
+static_assert(GraphPass<PruningPass>);
 } // namespace tiny_llm

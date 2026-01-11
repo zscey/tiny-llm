@@ -15,6 +15,21 @@ SafeTensorWeightManager::SafeTensorWeightManager(const std::string &path) {
   TINY_LLM_CHECK(ctx_);
 }
 
+SafeTensorWeightManager::SafeTensorWeightManager(
+    SafeTensorWeightManager &&other) noexcept {
+  std::swap(ctx_, other.ctx_);
+  std::swap(user_defined_weights_, other.user_defined_weights_);
+}
+
+auto SafeTensorWeightManager::operator=(
+    SafeTensorWeightManager &&other) noexcept -> SafeTensorWeightManager & {
+  if (this != std::addressof(other)) {
+    std::swap(ctx_, other.ctx_);
+    std::swap(user_defined_weights_, other.user_defined_weights_);
+  }
+  return *this;
+}
+
 auto SafeTensorWeightManager::get_tensor(const std::string &name) -> SliceView {
   TINY_LLM_CHECK(!name.empty());
   auto iter = user_defined_weights_.find(name);

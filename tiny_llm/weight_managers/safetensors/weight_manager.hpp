@@ -11,7 +11,12 @@ namespace tiny_llm {
 class SafeTensorWeightManager {
 public:
   explicit SafeTensorWeightManager(const std::string &path);
-  TINY_LLM_DELETE_COPY_MOVE(SafeTensorWeightManager);
+  SafeTensorWeightManager(const SafeTensorWeightManager &) = delete;
+  auto operator=(const SafeTensorWeightManager &)
+      -> SafeTensorWeightManager & = delete;
+  SafeTensorWeightManager(SafeTensorWeightManager &&) noexcept;
+  auto operator=(SafeTensorWeightManager &&) noexcept
+      -> SafeTensorWeightManager &;
   ~SafeTensorWeightManager();
 
   auto get_tensor(const std::string &name) -> SliceView;
