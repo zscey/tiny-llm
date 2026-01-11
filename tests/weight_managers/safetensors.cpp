@@ -5,10 +5,9 @@
 namespace tiny_llm {
 
 TEST(WeightManagers, SafeTensors) {
-  auto path = tiny_llm::utils::BazelRunfile::RLocation(
-      "tiny_llm/tests/datas/test.safetensors");
-
-  SafeTensorWeightManager manager(path);
+  WeightManagerWrapper manager(
+      (SafeTensorWeightManager(utils::BazelRunfile::RLocation(
+          "tiny_llm/tests/datas/test.safetensors"))));
 
   auto embedding = manager.get_tensor("embedding");
   const auto *embedding_ptr = reinterpret_cast<const float *>(embedding.data);

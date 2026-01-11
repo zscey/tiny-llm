@@ -1,5 +1,7 @@
 #include "tiny_llm/graph/graph.hpp"
 #include "tiny_llm/graph/graph_optimizer.hpp"
+#include "tiny_llm/utils/runfile.hpp"
+#include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
 
 namespace tiny_llm {
@@ -109,7 +111,10 @@ TEST(Graph, GraphBaseApi) {
 
   PassManager pass_manager;
   pass_manager.add_pass(PruningPass{});
-  pass_manager.run(graph);
+  WeightManagerWrapper weight_manager(
+      (SafeTensorWeightManager(utils::BazelRunfile::RLocation(
+          "tiny_llm/tests/datas/test.safetensors"))));
+  pass_manager.run(graph, weight_manager);
   {
     EXPECT_EQ(graph.node_name_to_idx.size(), 2);
     EXPECT_EQ(graph.node_name_to_idx.at("node1"), 0);
