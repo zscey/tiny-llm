@@ -33,47 +33,52 @@ using TestTypes = ::testing::Types<
 TYPED_TEST_SUITE(TensorBaseTest, TestTypes);
 
 TYPED_TEST(TensorBaseTest, TensorBaseApi) {
+  // move construct
+  Tensor cur_tensor = std::move(this->empty_tensor);
+
   { // empty_tensor
-    EXPECT_TRUE(this->empty_tensor.dtype() == this->dtype);
-    EXPECT_TRUE(this->empty_tensor.device().type == this->device.type);
-    EXPECT_TRUE(this->empty_tensor.device().id == this->device.id);
-    EXPECT_TRUE(this->empty_tensor.shape().empty());
-    EXPECT_TRUE(this->empty_tensor.stride().empty());
-    EXPECT_TRUE(this->empty_tensor.data() == nullptr);
+    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
+    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
+    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
+    EXPECT_TRUE(cur_tensor.shape().empty());
+    EXPECT_TRUE(cur_tensor.stride().empty());
+    EXPECT_TRUE(cur_tensor.data() == nullptr);
   }
 
+  cur_tensor = std::move(this->tensor);
   { // non-empty tensor
-    EXPECT_TRUE(this->empty_tensor.dtype() == this->dtype);
-    EXPECT_TRUE(this->empty_tensor.device().type == this->device.type);
-    EXPECT_TRUE(this->empty_tensor.device().id == this->device.id);
-    auto size = static_cast<int64_t>(type_size(this->tensor.dtype()));
-    EXPECT_TRUE((this->tensor.shape() == std::vector<int64_t>{3, 4, 5, 6}));
+    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
+    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
+    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
+    auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
+    EXPECT_TRUE((cur_tensor.shape() == std::vector<int64_t>{3, 4, 5, 6}));
     EXPECT_TRUE(
-        (this->tensor.stride() ==
+        (cur_tensor.stride() ==
          std::vector<int64_t>{size * 6 * 5 * 4, size * 6 * 5, size * 6, size}));
 
     {
-      const auto &const_tensor = this->tensor;
+      const auto &const_tensor = cur_tensor;
       EXPECT_ANY_THROW((void)const_tensor.data());
     }
-    EXPECT_NO_THROW(this->tensor.data());
-    EXPECT_TRUE(this->tensor.template data<float>() != nullptr);
+    EXPECT_NO_THROW(cur_tensor.data());
+    EXPECT_TRUE(cur_tensor.template data<float>() != nullptr);
     {
-      const auto &const_tensor = this->tensor;
+      const auto &const_tensor = cur_tensor;
       EXPECT_TRUE(const_tensor.data() != nullptr);
     }
 
     {
-      auto size = static_cast<int64_t>(type_size(this->tensor.dtype()));
+      auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
       const auto &tensor =
-          Tensor(this->tensor.device(), this->tensor.dtype(), {2, 3, 4, 5},
+          Tensor(cur_tensor.device(), cur_tensor.dtype(), {2, 3, 4, 5},
                  {(((((size * 5) + 1) * 4) + 1) * 3) + 1,
                   (((size * 5) + 1) * 4) + 1, (size * 5) + 1, size},
                  20,
-                 std::make_shared<Buffer>(this->tensor.data(), 1440,
-                                          this->tensor.device()));
-      const auto *ptr = tensor.data();
-      EXPECT_TRUE(ptr != nullptr);
+                 std::make_shared<Buffer>(cur_tensor.data(), 1440,
+                                          cur_tensor.device()));
+      EXPECT_TRUE(
+          tensor.data() ==
+          static_cast<void *>(cur_tensor.template data<uint8_t>() + 20));
       EXPECT_TRUE((tensor.shape() == std::vector<int64_t>{2, 3, 4, 5}));
       EXPECT_TRUE((tensor.stride() ==
                    std::vector<int64_t>{(((((size * 5) + 1) * 4) + 1) * 3) + 1,
