@@ -85,7 +85,7 @@ auto is_valid_shape_and_stride(const std::vector<int64_t> &shape,
 
 Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
                bool pre_allocate)
-    : device_(device), dtype_(dtype), shape_(std::move(shape)), offset_(0) {
+    : device_(device), dtype_(dtype), shape_(std::move(shape)) {
   TINY_LLM_CHECK(is_valid_shape(shape_));
   stride_ = shape_to_stride(shape_, dtype_);
 
@@ -107,6 +107,28 @@ Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
   TINY_LLM_CHECK(device_.id == buffer_->get_device().id);
 
   TINY_LLM_CHECK(offset + (shape_[0] * stride_[0]) <= buffer_->get_size());
+}
+
+Tensor::Tensor(Tensor &&other) noexcept {
+  std::swap(device_, other.device_);
+  std::swap(dtype_, other.dtype_);
+  std::swap(shape_, other.shape_);
+  std::swap(stride_, other.stride_);
+  std::swap(offset_, other.offset_);
+  std::swap(buffer_, other.buffer_);
+}
+
+auto Tensor::operator=(Tensor &&other) noexcept -> Tensor & {
+  if (this != std::addressof(other)) {
+    std::swap(device_, other.device_);
+    std::swap(dtype_, other.dtype_);
+    std::swap(shape_, other.shape_);
+    std::swap(stride_, other.stride_);
+    std::swap(offset_, other.offset_);
+    std::swap(buffer_, other.buffer_);
+  }
+
+  return *this;
 }
 
 auto Tensor::data() -> void * {

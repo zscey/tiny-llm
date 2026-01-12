@@ -22,6 +22,12 @@ public:
          std::vector<int64_t> stride, size_t offset,
          std::shared_ptr<Buffer> buffer);
 
+  Tensor(const Tensor &) = delete;
+  auto operator=(const Tensor &) -> Tensor & = delete;
+  Tensor(Tensor &&other) noexcept;
+  auto operator=(Tensor &&other) noexcept -> Tensor &;
+  ~Tensor() = default;
+
   [[nodiscard]] auto stride() const -> const std::vector<int64_t> & {
     return stride_;
   }
@@ -45,11 +51,11 @@ public:
   }
 
 private:
-  Device device_;
-  DataType dtype_;
+  Device device_{};
+  DataType dtype_{};
   std::vector<int64_t> shape_;
   std::vector<int64_t> stride_;
-  size_t offset_;
+  size_t offset_{};
   std::shared_ptr<Buffer> buffer_;
 };
 } // namespace tiny_llm
