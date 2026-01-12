@@ -3,7 +3,6 @@
 #include "tiny_llm/common/common_macros.hpp"
 #include "tiny_llm/weight_managers/weight_managers.hpp"
 #include <unordered_map>
-#include <vector>
 
 struct SafeTensorContext;
 
