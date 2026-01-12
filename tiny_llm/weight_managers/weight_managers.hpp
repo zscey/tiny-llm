@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tiny_llm/common/common_macros.hpp"
+#include "tiny_llm/tensor/tensor.hpp"
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -9,8 +10,10 @@
 
 namespace tiny_llm {
 struct SliceView {
-  const uint8_t *data;
-  size_t len;
+  DataType dtype;
+  std::vector<int64_t> shape;
+  const void *data;
+  size_t data_len;
 };
 
 template <typename T>
@@ -43,7 +46,7 @@ class WeightManagerWrapper {
       return entity.get_tensor(name);
     }
     void set_tensor(std::string name, SliceView slice_view) override {
-      entity.set_tensor(std::move(name), slice_view);
+      entity.set_tensor(std::move(name), std::move(slice_view));
     }
   };
 
@@ -59,7 +62,7 @@ public:
   }
 
   void set_tensor(std::string name, SliceView slice_view) {
-    self_->set_tensor(std::move(name), slice_view);
+    self_->set_tensor(std::move(name), std::move(slice_view));
   }
 };
 } // namespace tiny_llm
