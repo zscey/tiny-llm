@@ -1,5 +1,6 @@
 use memmap2::Mmap;
 use safetensors::SafeTensors;
+use safetensors::Dtype;
 use std::fs::File;
 use std::ffi::CStr;
 use std::panic::catch_unwind;
@@ -7,8 +8,11 @@ use std::os::raw::c_char;
 
 #[repr(C)]
 pub struct SliceView {
+    pub dtype: u32,
+    pub shape: [usize; 8],
+    pub shape_dim: usize,
     pub data: *const u8,
-    pub len: usize,
+    pub data_len: usize,
 }
 
 pub struct SafeTensorContext {
@@ -52,6 +56,32 @@ pub unsafe extern "C" fn safetensor_init(path: *const c_char) -> *mut SafeTensor
     }
 }
 
+fn dtype_to_u32(dtype: Dtype) -> u32 {
+    match dtype {
+        Dtype::BOOL => 0,
+        Dtype::F4 => 1,
+        Dtype::F6_E2M3 => 2,
+        Dtype::F6_E3M2 => 3,
+        Dtype::U8 => 4,
+        Dtype::I8 => 5,
+        Dtype::F8_E5M2 => 6,
+        Dtype::F8_E4M3 => 7,
+        Dtype::F8_E8M0 => 8,
+        Dtype::I16 => 9,
+        Dtype::U16 => 10,
+        Dtype::F16 => 11,
+        Dtype::BF16 => 12,
+        Dtype::I32 => 13,
+        Dtype::U32 => 14,
+        Dtype::F32 => 15,
+        Dtype::C64 => 16,
+        Dtype::F64 => 17,
+        Dtype::I64 => 18,
+        Dtype::U64 => 19,
+        _ => 999, // Unknown
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn safetensor_get_tensor(
     ctx: *mut SafeTensorContext,
@@ -65,9 +95,21 @@ pub unsafe extern "C" fn safetensor_get_tensor(
         let name_str = unsafe { CStr::from_ptr(name) }.to_str().ok()?;
         let t = unsafe { (*ctx).tensors.tensor(name_str) }.ok()?;
 
+        let t_shape = t.shape();
+        let shape_dim = t_shape.len();
+        if shape_dim > 8 {
+            return None;
+        }
+
+        let mut shape = [0usize; 8];
+        shape[..shape_dim].copy_from_slice(t_shape);
+
         Some(SliceView {
+            dtype: dtype_to_u32(t.dtype()),
+            shape,
+            shape_dim,
             data: t.data().as_ptr(),
-            len: t.data().len(),
+            data_len: t.data().len(),
         })
     };
 
@@ -77,12 +119,18 @@ pub unsafe extern "C" fn safetensor_get_tensor(
 
     match result {
         Ok(maybe_slice_view) => maybe_slice_view.unwrap_or(SliceView{
+            dtype: 999,
+            shape: [0usize; 8],
+            shape_dim: 0,
             data: std::ptr::null(),
-            len: 0,
+            data_len: 0,
         }),
         Err(_) => SliceView {
+            dtype: 999,
+            shape: [0usize; 8],
+            shape_dim: 0,
             data: std::ptr::null(),
-            len: 0,
+            data_len: 0,
         },
     }
 }
