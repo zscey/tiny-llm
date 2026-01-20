@@ -44,7 +44,7 @@ void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
       retain_tensor_infos.emplace(tensor_id);
     }
   }
-  std::unordered_map<uint32_t, uint32_t> tensor_origin_to_new;
+  std::map<uint32_t, uint32_t> tensor_origin_to_new;
   uint32_t new_id{};
   for (auto origin_id : retain_tensor_infos) {
     tensor_origin_to_new.emplace(origin_id, new_id++);
@@ -93,33 +93,25 @@ void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
   }
 
   // Shrink g.input_names
-  uint32_t i{};
-  for (uint32_t j = 0, j_end = g.input_names.size(); j < j_end; ++j) {
-    if (g.tensor_name_to_idx.contains(g.input_names.at(j))) {
-      if (i != j) {
-        g.input_names[i] = std::move(g.input_names[j]);
-      }
-      ++i;
+  for (auto iter = g.input_names.begin(); iter != g.input_names.end();) {
+    if (g.tensor_name_to_idx.contains(*iter)) {
+      ++iter;
+    } else {
+      iter = g.input_names.erase(iter);
     }
   }
-  g.input_names.resize(i);
 }
 } // namespace
 
 void PruningPass::run(Graph &g, WeightManagerWrapper & /*w*/) {
   (void)(this);
 
-  std::set<uint32_t> output_nodes;
-  for (const auto &name : g.output_names) {
-    output_nodes.emplace(g.tensor_infos[g.tensor_name_to_idx.at(name)]
-                             ->second.producer_node.value());
-  }
-
   std::vector<bool> is_visited(g.nodes.size(), false);
 
   std::queue<uint32_t> q;
-  for (auto node_id : output_nodes) {
-    q.push(node_id);
+  for (const auto &name : g.output_names) {
+    q.push(g.tensor_infos.at(g.tensor_name_to_idx.at(name))
+               ->second.producer_node.value());
   }
   while (!q.empty()) {
     auto cur_id = q.front();
