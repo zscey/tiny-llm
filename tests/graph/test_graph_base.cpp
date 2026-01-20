@@ -20,6 +20,9 @@ TEST(Graph, GraphBaseApi) {
       "node3", {.input_names = {"node1_out2"}, .output_names = {"node3_out1"}},
       AddParam{});
   graph.add_tensor("input2", DataType::kFloat32, {});
+  graph.add_node(
+      "node4", {.input_names = {"node3_out1"}, .output_names = {"node4_out1"}},
+      AddParam{});
   {
     EXPECT_ANY_THROW(graph.add_tensor("input2", DataType::kFloat32, {}));
     EXPECT_ANY_THROW(graph.add_node("node1", {}, AddParam{}));
@@ -30,14 +33,15 @@ TEST(Graph, GraphBaseApi) {
   graph.set_output_names({"node3_out1"});
   EXPECT_FALSE(is_valid(graph));
   graph.add_tensor("input3", DataType::kFloat32, {});
-  EXPECT_TRUE(is_valid(graph));
+  // invalid graph: node3_out1 -> node4
+  EXPECT_FALSE(is_valid(graph));
 
   {
-    EXPECT_EQ(graph.node_name_to_idx.size(), 3);
+    EXPECT_EQ(graph.node_name_to_idx.size(), 4);
     EXPECT_EQ(graph.node_name_to_idx.at("node1"), 0);
     EXPECT_EQ(graph.node_name_to_idx.at("node2"), 1);
     EXPECT_EQ(graph.node_name_to_idx.at("node3"), 2);
-    EXPECT_EQ(graph.tensor_name_to_idx.size(), 7);
+    EXPECT_EQ(graph.tensor_name_to_idx.size(), 8);
     EXPECT_EQ(graph.tensor_name_to_idx.at("input1"), 0);
     EXPECT_EQ(graph.tensor_name_to_idx.at("input2"), 1);
     EXPECT_EQ(graph.tensor_name_to_idx.at("node1_out1"), 2);
@@ -45,10 +49,12 @@ TEST(Graph, GraphBaseApi) {
     EXPECT_EQ(graph.tensor_name_to_idx.at("input3"), 4);
     EXPECT_EQ(graph.tensor_name_to_idx.at("node2_out1"), 5);
     EXPECT_EQ(graph.tensor_name_to_idx.at("node3_out1"), 6);
+    EXPECT_EQ(graph.tensor_name_to_idx.at("node4_out1"), 7);
     EXPECT_EQ(graph.input_names,
-              (std::vector<std::string>{"input1", "input2", "input3"}));
-    EXPECT_EQ(graph.output_names, std::vector<std::string>{"node3_out1"});
-    EXPECT_EQ(graph.nodes.size(), 3);
+              (std::unordered_set<std::string>{"input1", "input2", "input3"}));
+    EXPECT_EQ(graph.output_names,
+              std::unordered_set<std::string>{"node3_out1"});
+    EXPECT_EQ(graph.nodes.size(), 4);
     const auto &node0 = graph.nodes.at(0).value();
     EXPECT_EQ(node0.first, "node1");
     EXPECT_EQ(node0.second.input_tensors, (std::vector<uint32_t>{0, 1}));
@@ -64,8 +70,13 @@ TEST(Graph, GraphBaseApi) {
     EXPECT_EQ(node2.second.input_tensors, (std::vector<uint32_t>{3}));
     EXPECT_EQ(node2.second.output_tensors, (std::vector<uint32_t>{6}));
     EXPECT_EQ(node2.second.param.index(), 0);
+    const auto &node3 = graph.nodes.at(3).value();
+    EXPECT_EQ(node3.first, "node4");
+    EXPECT_EQ(node3.second.input_tensors, (std::vector<uint32_t>{6}));
+    EXPECT_EQ(node3.second.output_tensors, (std::vector<uint32_t>{7}));
+    EXPECT_EQ(node3.second.param.index(), 0);
 
-    EXPECT_EQ(graph.tensor_infos.size(), 7);
+    EXPECT_EQ(graph.tensor_infos.size(), 8);
     const auto &tensor_info0 = graph.tensor_infos.at(0).value();
     EXPECT_EQ(tensor_info0.first, "input1");
     EXPECT_EQ(tensor_info0.second.has_explicit_added, true);
@@ -106,7 +117,12 @@ TEST(Graph, GraphBaseApi) {
     EXPECT_EQ(tensor_info6.first, "node3_out1");
     EXPECT_EQ(tensor_info6.second.has_explicit_added, false);
     EXPECT_EQ(*tensor_info6.second.producer_node, 2);
-    EXPECT_TRUE(tensor_info6.second.consumer_nodes.empty());
+    EXPECT_TRUE(tensor_info6.second.consumer_nodes == std::vector<uint32_t>{3});
+    const auto &tensor_info7 = graph.tensor_infos.at(7).value();
+    EXPECT_EQ(tensor_info7.first, "node4_out1");
+    EXPECT_EQ(tensor_info7.second.has_explicit_added, false);
+    EXPECT_EQ(*tensor_info7.second.producer_node, 3);
+    EXPECT_TRUE(tensor_info7.second.consumer_nodes.empty());
   }
 
   PassManager pass_manager;
@@ -126,8 +142,9 @@ TEST(Graph, GraphBaseApi) {
     EXPECT_EQ(graph.tensor_name_to_idx.at("node1_out2"), 3);
     EXPECT_EQ(graph.tensor_name_to_idx.at("node3_out1"), 4);
     EXPECT_EQ(graph.input_names,
-              (std::vector<std::string>{"input1", "input2"}));
-    EXPECT_EQ(graph.output_names, std::vector<std::string>{"node3_out1"});
+              (std::unordered_set<std::string>{"input1", "input2"}));
+    EXPECT_EQ(graph.output_names,
+              std::unordered_set<std::string>{"node3_out1"});
     EXPECT_EQ(graph.nodes.size(), 2);
     const auto &node0 = graph.nodes.at(0).value();
     EXPECT_EQ(node0.first, "node1");
