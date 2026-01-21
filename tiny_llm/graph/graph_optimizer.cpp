@@ -138,7 +138,6 @@ void PruningPass::run(Graph &g, WeightManagerWrapper & /*w*/) {
     }
   }
   shrink(g, retain_nodes);
-  TINY_LLM_CHECK(is_valid(g));
 }
 
 static_assert(GraphPass<PruningPass>);

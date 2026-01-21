@@ -131,6 +131,7 @@ TEST(Graph, GraphBaseApi) {
       (SafeTensorWeightManager(utils::BazelRunfile::RLocation(
           "tiny_llm/tests/datas/test.safetensors"))));
   pass_manager.run(graph, weight_manager);
+  EXPECT_TRUE(is_valid(graph));
   {
     EXPECT_EQ(graph.node_name_to_idx.size(), 2);
     EXPECT_EQ(graph.node_name_to_idx.at("node1"), 0);
