@@ -13,7 +13,10 @@ cc_test(
         "tensor/*",
         "weight_managers/*",
     ]) + select({
-        "//platforms/device:cuda": glob(["device_managers/cuda/*"]),
+        "//platforms/device:cuda": glob([
+            "device_managers/cuda/*",
+            "runtime/cuda/*",
+        ]),
         "//conditions:default": [],
     }),
     data = ["//tests/datas"],
@@ -31,7 +34,10 @@ cc_test(
         "@googletest//:gtest",
         "@spdlog",
     ] + select({
-        "//platforms/device:cuda": ["//tiny_llm/device_managers/cuda:cuda_allocator"],
+        "//platforms/device:cuda": [
+            "//tiny_llm/device_managers/cuda:cuda_allocator",
+            "//tiny_llm/runtime/cuda:cuda_plan",
+        ],
         "//conditions:default": [],
     }),
 )
