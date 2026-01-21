@@ -162,8 +162,7 @@ auto create_cuda_plan(const Graph &graph, const PlanConfig &plan_config)
     -> CudaPlan {
   auto topo_order_nodes = topological_order(graph);
   // node id to topo id
-  std::vector<uint32_t> nodes_mapping;
-  nodes_mapping.reserve(topo_order_nodes.size());
+  std::vector<uint32_t> nodes_mapping(topo_order_nodes.size());
   for (uint32_t i = 0, i_end = topo_order_nodes.size(); i < i_end; ++i) {
     nodes_mapping[topo_order_nodes[i]] = i;
   }
