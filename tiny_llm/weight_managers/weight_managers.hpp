@@ -35,34 +35,34 @@ class WeightManagerWrapper {
     virtual void set_tensor(std::string name, SliceView slice_view) = 0;
   };
 
-  template <WeightManager T> struct Model final : public Concept {
-    T entity;
+  template <WeightManager T> struct Container final : public Concept {
+    T weight_manager;
 
-    explicit Model(T &&t) : entity(std::move(t)) {}
-    TINY_LLM_DEFAULT_COPY_MOVE(Model);
-    ~Model() override = default;
+    explicit Container(T &&t) : weight_manager(std::move(t)) {}
+    TINY_LLM_DEFAULT_COPY_MOVE(Container);
+    ~Container() override = default;
 
     auto get_tensor(const std::string &name) -> SliceView override {
-      return entity.get_tensor(name);
+      return weight_manager.get_tensor(name);
     }
     void set_tensor(std::string name, SliceView slice_view) override {
-      entity.set_tensor(std::move(name), std::move(slice_view));
+      weight_manager.set_tensor(std::move(name), std::move(slice_view));
     }
   };
 
-  std::unique_ptr<Concept> self_;
+  std::unique_ptr<Concept> wrapper_;
 
 public:
   template <WeightManager T>
   explicit WeightManagerWrapper(T &&t)
-      : self_(std::make_unique<Model<T>>(std::forward<T>(t))) {}
+      : wrapper_(std::make_unique<Container<T>>(std::forward<T>(t))) {}
 
   auto get_tensor(const std::string &name) -> SliceView {
-    return self_->get_tensor(name);
+    return wrapper_->get_tensor(name);
   }
 
   void set_tensor(std::string name, SliceView slice_view) {
-    self_->set_tensor(std::move(name), std::move(slice_view));
+    wrapper_->set_tensor(std::move(name), std::move(slice_view));
   }
 };
 } // namespace tiny_llm
