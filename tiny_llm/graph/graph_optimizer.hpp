@@ -14,18 +14,18 @@ concept GraphPass = std::move_constructible<T> &&
                     };
 
 class PassManager {
-  struct PassConcept {
-    PassConcept() = default;
-    TINY_LLM_DEFAULT_COPY_MOVE(PassConcept);
-    virtual ~PassConcept() = default;
+  struct Concept {
+    Concept() = default;
+    TINY_LLM_DEFAULT_COPY_MOVE(Concept);
+    virtual ~Concept() = default;
 
     virtual void run(Graph &g, WeightManagerWrapper &w) = 0;
   };
 
-  template <GraphPass T> struct Pass final : public PassConcept {
-    explicit Pass(T &&pass) : pass_concept(std::move(pass)) {}
-    TINY_LLM_DEFAULT_COPY_MOVE(Pass);
-    ~Pass() override = default;
+  template <GraphPass T> struct Container final : public Concept {
+    explicit Container(T &&pass) : pass_concept(std::move(pass)) {}
+    TINY_LLM_DEFAULT_COPY_MOVE(Container);
+    ~Container() override = default;
 
     void run(Graph &g, WeightManagerWrapper &w) override {
       pass_concept.run(g, w);
@@ -33,11 +33,12 @@ class PassManager {
     T pass_concept;
   };
 
-  std::vector<std::unique_ptr<PassConcept>> pipeline_;
+  std::vector<std::unique_ptr<Concept>> pipeline_;
 
 public:
   template <typename T> void add_pass(T &&pass) {
-    pipeline_.emplace_back(std::make_unique<Pass<T>>(std::forward<T>(pass)));
+    pipeline_.emplace_back(
+        std::make_unique<Container<T>>(std::forward<T>(pass)));
   }
 
   void run(Graph &g, WeightManagerWrapper &w) {
