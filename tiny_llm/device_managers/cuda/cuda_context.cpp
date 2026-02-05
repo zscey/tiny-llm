@@ -38,25 +38,28 @@ CudaContextAllocator::CudaContextAllocator() : impl_(std::make_unique<Impl>()) {
   TINY_LLM_CUDA_CHECK(cudaSetDevice(cur_dev));
 }
 
-CudaContextAllocator::~CudaContextAllocator() noexcept {
-  int32_t dev_num{};
-  TINY_LLM_CUDA_WARN(cudaGetDeviceCount(&dev_num));
+CudaContextAllocator::~CudaContextAllocator() noexcept = default;
+// CudaContextAllocator::~CudaContextAllocator() noexcept {
+// int32_t dev_num{};
+// TINY_LLM_CUDA_WARN(cudaGetDeviceCount(&dev_num));
 
-  int32_t cur_dev{};
-  TINY_LLM_CUDA_WARN(cudaGetDevice(&cur_dev));
+// int32_t cur_dev{};
+// TINY_LLM_CUDA_WARN(cudaGetDevice(&cur_dev));
 
-  for (int32_t dev_id = 0, dev_id_end = std::min(dev_num, MAX_CUDA_DEVICE_NUM);
-       dev_id < dev_id_end; ++dev_id) {
-    TINY_LLM_CUDA_WARN(cudaSetDevice(dev_id));
+// for (int32_t dev_id = 0, dev_id_end = std::min(dev_num,
+// MAX_CUDA_DEVICE_NUM);
+//      dev_id < dev_id_end; ++dev_id) {
+//   TINY_LLM_CUDA_WARN(cudaSetDevice(dev_id));
 
-    auto &streams = impl_->stream_pool.at(dev_id);
-    for (size_t stream_id = 0; stream_id < CUDA_STREAM_POOL_SIZE; ++stream_id) {
-      TINY_LLM_CUDA_WARN(cudaStreamDestroy(streams.at(stream_id)));
-    }
-  }
+//   auto &streams = impl_->stream_pool.at(dev_id);
+//   for (size_t stream_id = 0; stream_id < CUDA_STREAM_POOL_SIZE;
+//   ++stream_id) {
+//     TINY_LLM_CUDA_WARN(cudaStreamDestroy(streams.at(stream_id)));
+//   }
+// }
 
-  TINY_LLM_CUDA_WARN(cudaSetDevice(cur_dev));
-}
+// TINY_LLM_CUDA_WARN(cudaSetDevice(cur_dev));
+// }
 
 auto CudaContextAllocator::CreateCudaContext() -> CudaContext {
   int32_t cur_dev{};
