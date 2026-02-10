@@ -4,7 +4,9 @@ package(default_visibility = ["//:__subpackages__"])
 
 cc_library(
     name = "param",
+    srcs = ["param.cpp"],
     hdrs = ["param.hpp"],
+    deps = ["//tiny_llm/utils:visitor"],
 )
 
 cc_library(

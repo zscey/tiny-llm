@@ -35,6 +35,8 @@ void Graph::add_tensor(const std::string &name, DataType dtype,
 void Graph::add_node(const std::string &name, const NodeIONames &node_io_names,
                      Param param) {
   TINY_LLM_CHECK(!node_name_to_idx.contains(name));
+  TINY_LLM_CHECK(node_io_names.input_names.size() == input_num(param));
+  TINY_LLM_CHECK(node_io_names.output_names.size() == output_num(param));
 
   auto node_id = nodes.size();
   node_name_to_idx.emplace(name, node_id);

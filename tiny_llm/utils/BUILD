@@ -11,3 +11,8 @@ cc_library(
         "@bazel_tools//tools/cpp/runfiles",
     ],
 )
+
+cc_library(
+    name = "visitor",
+    hdrs = ["visitor.hpp"],
+)

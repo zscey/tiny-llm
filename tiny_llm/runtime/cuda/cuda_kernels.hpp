@@ -2,10 +2,8 @@
 
 #include "cuda_runtime.h"
 #include "tiny_llm/runtime/common.hpp"
-#include <array>
 #include <cstddef>
 #include <variant>
-#include <vector>
 
 namespace tiny_llm::cuda {
 struct ExecuteContext {
@@ -13,7 +11,7 @@ struct ExecuteContext {
 };
 
 /// @brief {a, b} -> {c}
-class AddKernel {
+class SiLUKernel {
 public:
   size_t element_size{};
 
@@ -23,5 +21,5 @@ public:
                ExecuteContext &ctx);
 };
 
-using CudaKernel = std::variant<AddKernel>;
+using CudaKernel = std::variant<SiLUKernel>;
 } // namespace tiny_llm::cuda

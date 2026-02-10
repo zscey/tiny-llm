@@ -1,15 +1,14 @@
 #include "tiny_llm/runtime/cuda/cuda_plan.hpp"
-#include "cuda_kernels.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/utils/visitor.hpp"
 #include <algorithm>
 #include <stack>
-#include <stdexcept>
 #include <unordered_set>
 
 namespace tiny_llm::cuda {
 namespace {
 const auto kKernelGenerator = Visitor{
-    [](const AddParam &) { return AddKernel{}; },
+    [](const SiLUParam &) { return SiLUKernel{}; },
 };
 
 enum class Status : std::uint8_t {
@@ -18,6 +17,7 @@ enum class Status : std::uint8_t {
   kBlack,
 };
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto topological_order(const Graph &graph) -> std::vector<uint32_t> {
   std::vector<uint32_t> res;
   res.reserve(graph.nodes.size());
@@ -25,30 +25,34 @@ auto topological_order(const Graph &graph) -> std::vector<uint32_t> {
 
   std::stack<uint32_t> stack;
   for (uint32_t id = 0, id_end = graph.nodes.size(); id < id_end; ++id) {
+    if (status.at(id) != Status::kWhite) {
+      continue;
+    }
+
     stack.push(id);
-  }
-  while (!stack.empty()) {
-    uint32_t node_id = stack.top();
+    while (!stack.empty()) {
+      uint32_t node_id = stack.top();
 
-    if (status.at(node_id) == Status::kWhite) {
-      status[node_id] = Status::kGray;
+      if (status.at(node_id) == Status::kWhite) {
+        status[node_id] = Status::kGray;
 
-      for (auto tensor_id : graph.nodes.at(node_id)->second.output_tensors) {
-        for (auto next_node_id :
-             graph.tensor_infos.at(tensor_id)->second.consumer_nodes) {
-          if (status.at(next_node_id) == Status::kWhite) {
-            stack.push(next_node_id);
-          } else if (status.at(next_node_id) == Status::kGray) {
-            TINY_LLM_THROW_ERROR(std::runtime_error, "Cycle in graph.");
+        for (auto tensor_id : graph.nodes.at(node_id)->second.output_tensors) {
+          for (auto next_node_id :
+               graph.tensor_infos.at(tensor_id)->second.consumer_nodes) {
+            if (status.at(next_node_id) == Status::kWhite) {
+              stack.push(next_node_id);
+            } else if (status.at(next_node_id) == Status::kGray) {
+              TINY_LLM_THROW_ERROR(std::runtime_error, "Cycle in graph.");
+            }
           }
         }
+      } else {
+        if (status[node_id] == Status::kGray) {
+          status[node_id] = Status::kBlack;
+          res.emplace_back(node_id);
+        }
+        stack.pop();
       }
-    } else {
-      if (status[node_id] == Status::kGray) {
-        status[node_id] = Status::kBlack;
-        res.emplace_back(node_id);
-      }
-      stack.pop();
     }
   }
 
@@ -69,9 +73,10 @@ auto vector_convert(const std::vector<From> &from) -> std::vector<To> {
 auto create_task(CudaPlan &plan, std::unordered_set<uint32_t> &cache,
                  const Graph &graph, uint32_t node_id,
                  const std::vector<uint32_t> &nodes_mapping) -> void {
-  const auto &graph_node = graph.nodes.at(node_id)->second;
+  const auto &[node_name, graph_node] = graph.nodes.at(node_id).value();
   auto &task = plan.tasks.emplace_back(
-      CudaPlan::Task{.kernel = std::visit(kKernelGenerator, graph_node.param)});
+      CudaPlan::Task{.name = node_name,
+                     .kernel = std::visit(kKernelGenerator, graph_node.param)});
 
   task.input_descs.reserve(graph_node.input_tensors.size());
   cache.clear();
@@ -106,7 +111,7 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id,
                 const PlanConfig &plan_config) {
   const auto &graph_node = graph.nodes.at(node_id)->second;
 
-  auto task_id = plan.tasks.size() - 1;
+  auto task_id = static_cast<uint32_t>(plan.tasks.size() - 1);
   uint32_t input_id{};
   for (auto tensor_id : graph_node.input_tensors) {
     const auto &[tensor_name, graph_tensor_info] =
@@ -146,14 +151,19 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id,
       },
       cur_task.kernel);
 
+  uint32_t output_id{};
   for (auto tensor_id : graph_node.output_tensors) {
     const auto &tensor_name = graph.tensor_infos.at(tensor_id)->first;
     if (graph.output_names.contains(tensor_name)) {
-      plan.output_infos[tensor_name] = tensor_id;
+      std::get<0>(plan.output_infos[tensor_name]) = tensor_id;
+      std::get<1>(plan.output_infos[tensor_name]) =
+          CudaPlan::TaskIO{.task_id = task_id, .io_id = output_id};
     }
 
     plan.tensor_descs.at(tensor_id).max_shape =
         plan.tensor_descs.at(tensor_id).cur_shape;
+
+    ++output_id;
   }
 }
 } // namespace

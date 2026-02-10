@@ -12,6 +12,8 @@ struct PlanConfig {
 
 struct CudaPlan {
   struct Task {
+    std::string name;
+
     CudaKernel kernel;
     std::vector<const TensorDesc *> input_descs;
     std::vector<TensorDesc *> output_descs;
@@ -23,16 +25,19 @@ struct CudaPlan {
     std::vector<uint32_t> successors;
   };
 
+  struct TaskIO {
+    uint32_t task_id{};
+    uint32_t io_id{};
+  };
+
   std::vector<TensorDesc> tensor_descs;
   std::vector<Task> tasks;
 
-  // name -> {desc_id, {task_id, input_id_in_task}}
-  std::unordered_map<
-      std::string,
-      std::tuple<uint32_t, std::vector<std::pair<uint32_t, uint32_t>>>>
+  // name -> {desc_id, task_inputs}
+  std::unordered_map<std::string, std::pair<uint32_t, std::vector<TaskIO>>>
       input_infos;
-  // name -> desc_id
-  std::unordered_map<std::string, uint32_t> output_infos;
+  // name -> {desc_id, task_output}
+  std::unordered_map<std::string, std::pair<uint32_t, TaskIO>> output_infos;
 };
 
 /**
