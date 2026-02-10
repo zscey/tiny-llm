@@ -20,5 +20,6 @@ cc_library(
     deps = [
         ":cuda_kernels",
         "//tiny_llm/graph",
+        "//tiny_llm/utils:visitor",
     ],
 )

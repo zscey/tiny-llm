@@ -14,9 +14,9 @@ cc_library(
 )
 
 cuda_library(
-    name = "add",
-    srcs = ["add.cu"],
-    hdrs = ["add.hpp"],
+    name = "silu",
+    srcs = ["silu.cu"],
+    hdrs = ["silu.hpp"],
     deps = [
         ":cuda_op_common",
     ],
@@ -25,5 +25,5 @@ cuda_library(
 cc_library(
     name = "cuda_ops",
     visibility = ["//:__subpackages__"],
-    deps = [":add"],
+    deps = [":silu"],
 )
