@@ -1,13 +1,14 @@
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_context.hpp"
-#include "tiny_llm/device_managers/cuda/cuda_guards.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_device_guard.hpp"
 
 namespace tiny_llm {
 namespace {
 class CudaDeleter : public IDeleter {
 public:
-  explicit CudaDeleter(int32_t dev_id) : dev_id_(dev_id) {}
+  explicit CudaDeleter(CudaContext cuda_context)
+      : cuda_context_(cuda_context) {}
 
   TINY_LLM_DELETE_COPY_MOVE(CudaDeleter);
 
@@ -15,16 +16,32 @@ public:
 
   void cleanup(void *ptr) override {
     if (ptr != nullptr) {
-      CudaDeviceSwitchGuard guard(dev_id_);
-      TINY_LLM_CUDA_WARN(
-          cudaFreeAsync(ptr, ThreadCudaContexts::GetContext().stream));
+      CudaDeviceSwitchGuard guard(cuda_context_.id);
+      TINY_LLM_CUDA_WARN(cudaFreeAsync(ptr, cuda_context_.stream));
     }
   }
 
 private:
-  int32_t dev_id_{};
+  CudaContext cuda_context_{};
 };
 
+} // namespace
+
+auto CudaAllocator::Allocate(std::size_t size) -> Buffer {
+  auto cuda_context = ThreadCudaContexts::GetContext();
+
+  void *ptr{};
+  if (size > 0) {
+    TINY_LLM_CUDA_CHECK(cudaMallocAsync(&ptr, size, cuda_context.stream));
+  }
+
+  return {ptr,
+          size,
+          {.type = DeviceType::kCuda, .id = cuda_context.id},
+          std::make_unique<CudaDeleter>(cuda_context)};
+}
+
+namespace {
 class CudaHostDeleter : public IDeleter {
 public:
   CudaHostDeleter() = default;
@@ -41,21 +58,11 @@ public:
 };
 } // namespace
 
-auto CudaAllocator::Allocate(std::size_t size) -> Buffer {
-  auto cuda_context = ThreadCudaContexts::GetContext();
-
-  void *ptr{};
-  TINY_LLM_CUDA_CHECK(cudaMallocAsync(&ptr, size, cuda_context.stream));
-
-  return {ptr,
-          size,
-          {.type = DeviceType::kCuda, .id = cuda_context.id},
-          std::make_unique<CudaDeleter>(cuda_context.id)};
-}
-
 auto CudaHostAllocator::Allocate(std::size_t size) -> Buffer {
   void *ptr{};
-  TINY_LLM_CUDA_CHECK(cudaMallocHost(&ptr, size));
+  if (size > 0) {
+    TINY_LLM_CUDA_CHECK(cudaMallocHost(&ptr, size));
+  }
 
   return {ptr,
           size,

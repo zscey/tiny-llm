@@ -18,6 +18,7 @@ using DeviceId = std::int8_t;
 
 struct Device {
   DeviceType type{DeviceType::kCpu};
+  // -1 indicates the current device, which is useful in scenarios such as CUDA.
   DeviceId id{-1};
 };
 

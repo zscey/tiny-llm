@@ -1,7 +1,6 @@
 #pragma once
 
 #include "tiny_llm/common/common_macros.hpp"
-#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include <cstdint>
 
 namespace tiny_llm {
@@ -19,15 +18,4 @@ private:
   int32_t origin_dev_{};
 };
 
-/// @brief Set `cuda_context` as the cuda context of the current thread when
-/// constructing, and reset the original cuda context of the current thread when
-/// destroying.
-class ThreadCudaContextsGuard {
-public:
-  explicit ThreadCudaContextsGuard(CudaContext cuda_context);
-
-  TINY_LLM_DELETE_COPY_MOVE(ThreadCudaContextsGuard);
-
-  ~ThreadCudaContextsGuard() noexcept;
-};
 } // namespace tiny_llm
