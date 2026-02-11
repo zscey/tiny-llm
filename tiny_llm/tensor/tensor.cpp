@@ -5,7 +5,7 @@
 
 #ifdef TENSOR_WITH_CUDA
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
-#include "tiny_llm/device_managers/cuda/cuda_guards.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_device_guard.hpp"
 #endif
 
 namespace tiny_llm {

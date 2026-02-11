@@ -24,7 +24,7 @@ auto CpuAllocator::Allocate(size_t size, size_t alignment) -> Buffer {
   TINY_LLM_CHECK(alignment != 0);
 
   void *ptr{};
-  if (size != 0) {
+  if (size > 0) {
     auto alloc_size = (size + (alignment - 1)) / alignment * alignment;
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     ptr = std::aligned_alloc(alignment, alloc_size);
