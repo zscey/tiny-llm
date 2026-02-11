@@ -39,23 +39,24 @@ CudaContextAllocator::CudaContextAllocator() : impl_(std::make_unique<Impl>()) {
   }
 }
 
-// CudaContextAllocator::~CudaContextAllocator() noexcept = default;
-CudaContextAllocator::~CudaContextAllocator() noexcept {
-  int32_t dev_num{};
-  TINY_LLM_CUDA_WARN(cudaGetDeviceCount(&dev_num));
+CudaContextAllocator::~CudaContextAllocator() noexcept = default;
+// CudaContextAllocator::~CudaContextAllocator() noexcept {
+//   int32_t dev_num{};
+//   TINY_LLM_CUDA_WARN(cudaGetDeviceCount(&dev_num));
 
-  CudaDeviceSwitchGuard guard(-1);
+//   CudaDeviceSwitchGuard guard(-1);
 
-  for (int32_t dev_id = 0, dev_id_end = std::min(dev_num, MAX_CUDA_DEVICE_NUM);
-       dev_id < dev_id_end; ++dev_id) {
-    TINY_LLM_CUDA_WARN(cudaSetDevice(dev_id));
+//   for (int32_t dev_id = 0, dev_id_end = std::min(dev_num,
+//   MAX_CUDA_DEVICE_NUM);
+//        dev_id < dev_id_end; ++dev_id) {
+//     TINY_LLM_CUDA_WARN(cudaSetDevice(dev_id));
 
-    auto &streams = impl_->stream_pool.at(dev_id);
-    for (auto &stream : streams) {
-      TINY_LLM_CUDA_WARN(cudaStreamDestroy(stream));
-    }
-  }
-}
+//     auto &streams = impl_->stream_pool.at(dev_id);
+//     for (auto &stream : streams) {
+//       TINY_LLM_CUDA_WARN(cudaStreamDestroy(stream));
+//     }
+//   }
+// }
 
 auto CudaContextAllocator::CreateCudaContext(int32_t dev_id) -> CudaContext {
   if (dev_id < 0) {
