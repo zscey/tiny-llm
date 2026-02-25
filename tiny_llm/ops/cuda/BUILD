@@ -9,6 +9,7 @@ cc_library(
         "cuda_op_common.hpp",
     ],
     deps = [
+        "//tiny_llm/device_managers/cuda:cuda_context",
         "@local_cuda//:cuda_runtime",
     ],
 )

@@ -3,9 +3,12 @@
 #include "tiny_llm/device_managers/cpu/cpu_allocator.hpp"
 #include <algorithm>
 #include <numeric>
+#include <stdexcept>
 
 #ifdef TENSOR_WITH_CUDA
+#include "cuda_runtime.h"
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_device_guard.hpp"
 #endif
 
@@ -101,6 +104,9 @@ Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
                std::shared_ptr<Buffer> buffer)
     : device_(device), dtype_(dtype), shape_(std::move(shape)),
       stride_(std::move(stride)), offset_(offset), buffer_(std::move(buffer)) {
+  if (stride_.empty()) {
+    stride_ = shape_to_stride(shape_, dtype_);
+  }
   TINY_LLM_CHECK(!shape_.empty());
   TINY_LLM_CHECK(is_valid_shape_and_stride(shape_, stride_, dtype_));
   TINY_LLM_CHECK(buffer_ != nullptr);
@@ -158,12 +164,82 @@ void Tensor::reallocate(std::vector<int64_t> shape) {
   TINY_LLM_CHECK(is_valid_shape(shape));
   stride_ = shape_to_stride(shape, dtype_);
 
-  if (buffer_->get_size() >=
-      static_cast<size_t>(element_size(shape)) * type_size(dtype_)) {
+  if (buffer_ != nullptr &&
+      buffer_->get_size() >=
+          static_cast<size_t>(element_size(shape)) * type_size(dtype_)) {
     shape_ = std::move(shape);
     return;
   }
 
   *this = Tensor(device_, dtype_, std::move(shape));
+}
+
+auto Tensor::is_continuous() const -> bool {
+  return (shape_to_stride(shape_, dtype_) <=> stride_) == 0;
+}
+
+void Tensor::copy_to(Tensor &tensor) const {
+  if (!is_continuous()) {
+    TINY_LLM_THROW_ERROR(std::runtime_error,
+                         "The source tensor is discontinuous.");
+  }
+  if (!tensor.is_continuous()) {
+    TINY_LLM_THROW_ERROR(std::runtime_error,
+                         "The target tensor is discontinuous.");
+  }
+  TINY_LLM_CHECK(dtype_ == tensor.dtype_);
+  TINY_LLM_CHECK(shape_ == tensor.shape_);
+
+  auto copy_size =
+      static_cast<size_t>(element_size(shape_)) * type_size(dtype_);
+  switch (device_.type) {
+#ifdef TENSOR_WITH_CUDA
+  case DeviceType::kCudaHost:
+#endif
+  case DeviceType::kCpu: {
+    switch (tensor.device_.type) {
+#ifdef TENSOR_WITH_CUDA
+    case DeviceType::kCuda:
+      TINY_LLM_CUDA_CHECK(cudaMemcpyAsync(
+          tensor.data(), this->data(), copy_size, cudaMemcpyHostToDevice,
+          ThreadCudaContexts::GetContext().stream));
+      return;
+    case DeviceType::kCudaHost:
+#endif
+    case DeviceType::kCpu:
+      std::memcpy(tensor.data(), this->data(), copy_size);
+      return;
+    default:
+      break;
+    }
+  }
+#ifdef TENSOR_WITH_CUDA
+  case DeviceType::kCuda: {
+    switch (tensor.device_.type) {
+    case DeviceType::kCudaHost:
+    case DeviceType::kCpu:
+      TINY_LLM_CUDA_CHECK(cudaMemcpyAsync(
+          tensor.data(), this->data(), copy_size, cudaMemcpyDeviceToHost,
+          ThreadCudaContexts::GetContext().stream));
+      return;
+    default:
+      break;
+    }
+  }
+#endif
+  default:
+    break;
+  }
+
+  TINY_LLM_THROW_ERROR(std::runtime_error,
+                       "Copy from [{}:{}] to [{}:{}] not implemented.",
+                       to_string(device_.type), device_.id,
+                       to_string(tensor.device_.type), tensor.device_.id);
+}
+
+auto Tensor::to(Device device) const -> Tensor {
+  Tensor res(device, dtype_, shape_, true);
+  copy_to(res);
+  return res;
 }
 } // namespace tiny_llm

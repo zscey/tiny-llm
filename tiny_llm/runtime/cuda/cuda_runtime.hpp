@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tiny_llm/device_managers/buffer.hpp"
+#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include "tiny_llm/runtime/cuda/cuda_plan.hpp"
 #include "tiny_llm/runtime/iruntime.hpp"
 #include "tiny_llm/weight_managers/weight_managers.hpp"
@@ -21,9 +22,11 @@ public:
 
   void bind_input(const std::string &name, const Tensor &tensor) override;
 
+  // sync
   void cpu_tensor_copy_to_input(const std::string &name,
                                 const Tensor &tensor) override;
 
+  // sync
   void output_copy_to_cpu_tensor(const std::string &name,
                                  Tensor &tensor) const override;
 
@@ -34,6 +37,6 @@ private:
   Buffer buffer_;
 
   std::unordered_map<std::string, void *> input_ptrs_;
-  ExecuteContext ctx_;
+  CudaContext ctx_;
 };
 } // namespace tiny_llm::cuda
