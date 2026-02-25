@@ -23,3 +23,18 @@ cc_library(
         "//tiny_llm/utils:visitor",
     ],
 )
+
+cc_library(
+    name = "cuda_runtime",
+    srcs = ["cuda_runtime.cpp"],
+    hdrs = ["cuda_runtime.hpp"],
+    deps = [
+        ":cuda_plan",
+        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/device_managers/cuda:cuda_allocator",
+        "//tiny_llm/device_managers/cuda:cuda_context",
+        "//tiny_llm/runtime:greedy_memory_planer",
+        "//tiny_llm/runtime:iruntime",
+        "//tiny_llm/weight_managers",
+    ],
+)

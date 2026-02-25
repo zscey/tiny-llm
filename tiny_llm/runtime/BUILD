@@ -27,3 +27,12 @@ cc_library(
         "//tiny_llm/common:log_and_excepts",
     ],
 )
+
+cc_library(
+    name = "iruntime",
+    hdrs = ["iruntime.hpp"],
+    deps = [
+        "//tiny_llm/common:common_macros",
+        "//tiny_llm/tensor",
+    ],
+)

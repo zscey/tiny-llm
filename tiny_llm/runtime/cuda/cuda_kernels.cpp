@@ -14,7 +14,7 @@ void SiLUKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
 }
 
 void SiLUKernel::execute(const void *const *inputs, void *const *outputs,
-                         ExecuteContext &ctx) {
+                         const ExecuteContext &ctx) {
   (void)(this);
   silu(static_cast<const float *>(inputs[0]), static_cast<float *>(outputs[0]),
        element_size, ctx.stream);

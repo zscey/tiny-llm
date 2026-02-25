@@ -2,6 +2,7 @@
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/device_managers/cpu/cpu_allocator.hpp"
 #include <algorithm>
+#include <numeric>
 
 #ifdef TENSOR_WITH_CUDA
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
@@ -144,5 +145,25 @@ auto Tensor::data() const -> const void * {
     TINY_LLM_THROW_ERROR(std::runtime_error, "Tensor is not allocated.");
   }
   return static_cast<const uint8_t *>(buffer_->get_ptr()) + offset_;
+}
+
+namespace {
+auto element_size(const std::vector<int64_t> &shape) -> int64_t {
+  return std::accumulate(shape.begin(), shape.end(), 1,
+                         [](auto a, auto b) { return a * b; });
+}
+} // namespace
+
+void Tensor::reallocate(std::vector<int64_t> shape) {
+  TINY_LLM_CHECK(is_valid_shape(shape));
+  stride_ = shape_to_stride(shape, dtype_);
+
+  if (buffer_->get_size() >=
+      static_cast<size_t>(element_size(shape)) * type_size(dtype_)) {
+    shape_ = std::move(shape);
+    return;
+  }
+
+  *this = Tensor(device_, dtype_, std::move(shape));
 }
 } // namespace tiny_llm
