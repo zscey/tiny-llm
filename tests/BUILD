@@ -17,6 +17,7 @@ cc_test(
         "//platforms/device:cuda": glob([
             "device_managers/cuda/*",
             "runtime/cuda/*",
+            "ops/cuda/*",
         ]),
         "//conditions:default": [],
     }),
