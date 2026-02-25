@@ -119,10 +119,12 @@ TEST(Runtime, CudaRuntime) {
     Tensor node1_out({.type = DeviceType::kCpu}, DataType::kFloat32, {2}, true);
     cuda_runtime.output_copy_to_cpu_tensor("node1_out", node1_out);
     EXPECT_FLOAT_EQ(*node1_out.data<float>(), silu(1.F));
+    EXPECT_EQ(node1_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
     Tensor node3_out({.type = DeviceType::kCudaHost}, DataType::kFloat32,
                      {2, 3, 4, 12}, true);
     cuda_runtime.output_copy_to_cpu_tensor("node3_out", node3_out);
     EXPECT_FLOAT_EQ(*node3_out.data<float>(), silu(silu(1.F)));
+    EXPECT_EQ(node3_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
   }
 }
 
