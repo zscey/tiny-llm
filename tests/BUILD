@@ -38,7 +38,7 @@ cc_test(
     ] + select({
         "//platforms/device:cuda": [
             "//tiny_llm/device_managers/cuda:cuda_allocator",
-            "//tiny_llm/runtime/cuda:cuda_plan",
+            "//tiny_llm/runtime/cuda:cuda_runtime",
         ],
         "//conditions:default": [],
     }),

@@ -86,5 +86,28 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
                                         (size * 5) + 1, size}));
     }
   }
+
+  {
+    const auto *ptr = cur_tensor.data();
+    cur_tensor.reallocate({3, 4, 7, 4});
+    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
+    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
+    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
+    EXPECT_TRUE(cur_tensor.data() == ptr);
+    EXPECT_TRUE(cur_tensor.shape() == (std::vector<int64_t>{3, 4, 7, 4}));
+    auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
+    EXPECT_TRUE(
+        (cur_tensor.stride() ==
+         std::vector<int64_t>{size * 4 * 7 * 4, size * 7 * 4, size * 4, size}));
+
+    cur_tensor.reallocate({3, 4, 7, 5});
+    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
+    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
+    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
+    EXPECT_TRUE(cur_tensor.shape() == (std::vector<int64_t>{3, 4, 7, 5}));
+    EXPECT_TRUE(
+        (cur_tensor.stride() ==
+         std::vector<int64_t>{size * 4 * 7 * 5, size * 7 * 5, size * 5, size}));
+  }
 }
 } // namespace tiny_llm

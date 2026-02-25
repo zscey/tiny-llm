@@ -18,7 +18,7 @@ public:
   void dtype_shape_infer(const TensorDesc *const *input_descs,
                          TensorDesc *const *output_descs);
   void execute(const void *const *inputs, void *const *outputs,
-               ExecuteContext &ctx);
+               const ExecuteContext &ctx);
 };
 
 using CudaKernel = std::variant<SiLUKernel>;

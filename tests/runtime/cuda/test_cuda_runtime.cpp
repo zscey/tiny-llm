@@ -1,9 +1,17 @@
-#include "tiny_llm/runtime/cuda/cuda_plan.hpp"
+#include "tiny_llm/runtime/cuda/cuda_runtime.hpp"
+#include "tiny_llm/utils/runfile.hpp"
+#include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 namespace tiny_llm {
-TEST(Runtime, CudaPlan) {
+namespace {
+auto silu(float f) -> float { return f / (1 + std::exp(-f)); }
+} // namespace
+
+TEST(Runtime, CudaRuntime) {
   Graph graph;
   graph.add_tensor("input1", DataType::kFloat32, {2, 3, 4, 5});
   graph.add_node("node1",
@@ -84,6 +92,39 @@ TEST(Runtime, CudaPlan) {
               (std::vector<const TensorDesc *>{&cuda_plan.tensor_descs.at(0)}));
     EXPECT_EQ(task2.output_descs,
               (std::vector<TensorDesc *>{&cuda_plan.tensor_descs.at(1)}));
+  }
+
+  {
+    cuda::CudaRuntime cuda_runtime(
+        std::move(cuda_plan),
+        WeightManagerWrapper(
+            SafeTensorWeightManager{utils::BazelRunfile::RLocation(
+                "tiny_llm/tests/datas/test.safetensors")}));
+    EXPECT_TRUE(cuda_runtime.input_names() ==
+                std::vector<std::string>{"input1"});
+    auto output_names = cuda_runtime.output_names();
+    std::ranges::sort(output_names);
+    EXPECT_TRUE(
+        (output_names == std::vector<std::string>{"node1_out", "node3_out"}));
+
+    Tensor input1({.type = DeviceType::kCpu}, DataType::kFloat32, {2, 3, 4, 10},
+                  true);
+    EXPECT_ANY_THROW(cuda_runtime.bind_input("input1", input1));
+    EXPECT_ANY_THROW(cuda_runtime.cpu_tensor_copy_to_input("input1", input1));
+    input1.reallocate({2, 3, 4, 1});
+    *input1.data<float>() = 1.F;
+    cuda_runtime.cpu_tensor_copy_to_input("input1", input1);
+    cuda_runtime.execute();
+
+    Tensor node1_out({.type = DeviceType::kCpu}, DataType::kFloat32, {2}, true);
+    cuda_runtime.output_copy_to_cpu_tensor("node1_out", node1_out);
+    EXPECT_FLOAT_EQ(*node1_out.data<float>(), silu(1.F));
+    EXPECT_EQ(node1_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
+    Tensor node3_out({.type = DeviceType::kCudaHost}, DataType::kFloat32,
+                     {2, 3, 4, 12}, true);
+    cuda_runtime.output_copy_to_cpu_tensor("node3_out", node3_out);
+    EXPECT_FLOAT_EQ(*node3_out.data<float>(), silu(silu(1.F)));
+    EXPECT_EQ(node3_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
   }
 }
 

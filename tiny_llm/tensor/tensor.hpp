@@ -50,6 +50,8 @@ public:
     return static_cast<const T *>(data());
   }
 
+  void reallocate(std::vector<int64_t> shape);
+
 private:
   Device device_{};
   DataType dtype_{};
