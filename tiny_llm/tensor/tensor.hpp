@@ -52,6 +52,14 @@ public:
 
   void reallocate(std::vector<int64_t> shape);
 
+  [[nodiscard]] auto is_continuous() const -> bool;
+
+  // May async
+  void copy_to(Tensor &tensor) const;
+
+  // May async
+  [[nodiscard]] auto to(Device device) const -> Tensor;
+
 private:
   Device device_{};
   DataType dtype_{};

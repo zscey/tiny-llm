@@ -1,3 +1,6 @@
+#ifdef TESTS_WITH_CUDA
+#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
+#endif
 #include "tiny_llm/tensor/tensor.hpp"
 #include "gtest/gtest.h"
 
@@ -76,6 +79,14 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
                  20,
                  std::make_shared<Buffer>(cur_tensor.data(), 1440,
                                           cur_tensor.device()));
+      EXPECT_TRUE(cur_tensor.is_continuous());
+      EXPECT_NO_THROW((void)(cur_tensor.to({DeviceType::kCpu, 0})));
+#ifdef TESTS_WITH_CUDA
+      EXPECT_NO_THROW((void)(cur_tensor.to({DeviceType::kCudaHost, 0})));
+#endif
+      EXPECT_FALSE(tensor.is_continuous());
+      EXPECT_ANY_THROW((void)(tensor.to({DeviceType::kCpu, 0})));
+      EXPECT_ANY_THROW((void)(tensor.to({DeviceType::kCudaHost, 0})));
       EXPECT_TRUE(
           tensor.data() ==
           static_cast<void *>(cur_tensor.template data<uint8_t>() + 20));
@@ -87,7 +98,7 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
     }
   }
 
-  {
+  { // reallocate
     const auto *ptr = cur_tensor.data();
     cur_tensor.reallocate({3, 4, 7, 4});
     EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
@@ -101,6 +112,7 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
          std::vector<int64_t>{size * 4 * 7 * 4, size * 7 * 4, size * 4, size}));
 
     cur_tensor.reallocate({3, 4, 7, 5});
+    (void)(cur_tensor.data());
     EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
     EXPECT_TRUE(cur_tensor.device().type == this->device.type);
     EXPECT_TRUE(cur_tensor.device().id == this->device.id);
@@ -109,5 +121,20 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
         (cur_tensor.stride() ==
          std::vector<int64_t>{size * 4 * 7 * 5, size * 7 * 5, size * 5, size}));
   }
+
+#ifdef TESTS_WITH_CUDA
+  { // copy from x to cuda
+    if (cur_tensor.device().type == DeviceType::kCpu ||
+        cur_tensor.device().type == DeviceType::kCudaHost) {
+      EXPECT_NO_THROW((void)(cur_tensor.to({DeviceType::kCuda, 0})));
+    }
+
+    if (cur_tensor.device().type == DeviceType::kCuda) {
+      EXPECT_ANY_THROW((void)(cur_tensor.to({DeviceType::kCuda, 0})));
+    }
+  }
+
+  ThreadCudaContexts::Synchronize();
+#endif
 }
 } // namespace tiny_llm

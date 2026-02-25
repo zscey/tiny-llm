@@ -13,10 +13,9 @@ void SiLUKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
                                  [](auto a, auto b) { return a * b; });
 }
 
-void SiLUKernel::execute(const void *const *inputs, void *const *outputs,
-                         const ExecuteContext &ctx) {
+void SiLUKernel::execute(const void *const *inputs, void *const *outputs) {
   (void)(this);
   silu(static_cast<const float *>(inputs[0]), static_cast<float *>(outputs[0]),
-       element_size, ctx.stream);
+       element_size);
 }
 } // namespace tiny_llm::cuda

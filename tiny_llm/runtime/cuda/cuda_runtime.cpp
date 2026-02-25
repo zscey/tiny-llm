@@ -133,8 +133,9 @@ auto vector_convert(const std::vector<From> &from) -> std::vector<To> {
 
 CudaRuntime::CudaRuntime(CudaPlan plan,
                          const WeightManagerWrapper &weight_manager_wrapper)
-    : plan_(std::move(plan)),
-      ctx_{CudaContextAllocator::CreateCudaContext().stream} {
+    : plan_(std::move(plan)), ctx_{CudaContextAllocator::CreateCudaContext()} {
+  ThreadCudaContextsGuard guard(ctx_);
+
   SizeCalculator size_calculator;
   size_calculator.apply(plan_);
 
@@ -199,6 +200,7 @@ void check_input(const CudaRuntime &cuda_runtime, const std::string &name,
 
 void CudaRuntime::bind_input(const std::string &name, const Tensor &tensor) {
   TINY_LLM_CHECK(tensor.device().type == DeviceType::kCuda);
+  TINY_LLM_CHECK(tensor.device().id == ctx_.id);
   check_input(*this, name, tensor);
 
   auto &[desc_id, task_ios] = plan_.input_infos.at(name);
@@ -218,14 +220,20 @@ void CudaRuntime::cpu_tensor_copy_to_input(const std::string &name,
   auto &[desc_id, task_ios] = plan_.input_infos.at(name);
   auto &desc = plan_.tensor_descs.at(desc_id);
   desc.cur_shape = vector_convert<int64_t, size_t>(tensor.shape());
-  TINY_LLM_CUDA_CHECK(
-      cudaMemcpy(input_ptrs_.at(name), tensor.data(),
-                 element_num(desc.cur_shape) * type_size(desc.dtype),
-                 cudaMemcpyHostToDevice));
+
+  Tensor dst_tensor({.type = DeviceType::kCuda, .id = ctx_.id}, desc.dtype,
+                    tensor.shape(), {}, 0,
+                    std::make_shared<Buffer>(
+                        input_ptrs_.at(name),
+                        element_num(desc.max_shape) * type_size(desc.dtype),
+                        Device{.type = DeviceType::kCuda, .id = ctx_.id}));
+  tensor.copy_to(dst_tensor);
   for (const auto &task_io : task_ios) {
     plan_.tasks.at(task_io.task_id).inputs.at(task_io.io_id) =
         input_ptrs_.at(name);
   }
+
+  ThreadCudaContexts::Synchronize();
 }
 
 void CudaRuntime::output_copy_to_cpu_tensor(const std::string &name,
@@ -239,19 +247,27 @@ void CudaRuntime::output_copy_to_cpu_tensor(const std::string &name,
   TINY_LLM_CHECK(desc.dtype == tensor.dtype());
 
   tensor.reallocate(vector_convert<size_t, int64_t>(desc.cur_shape));
-  TINY_LLM_CUDA_CHECK(cudaMemcpy(
-      tensor.data(), plan_.tasks.at(task_io.task_id).outputs.at(task_io.io_id),
-      element_num(desc.cur_shape) * type_size(desc.dtype),
-      cudaMemcpyDeviceToHost));
+  const Tensor output_tensor(
+      {.type = DeviceType::kCuda, .id = ctx_.id}, desc.dtype, tensor.shape(),
+      {}, 0,
+      std::make_shared<Buffer>(
+          plan_.tasks.at(task_io.task_id).outputs.at(task_io.io_id),
+          element_num(desc.max_shape) * type_size(desc.dtype),
+          Device{.type = DeviceType::kCuda, .id = ctx_.id}));
+  output_tensor.copy_to(tensor);
+
+  ThreadCudaContexts::Synchronize();
 }
 
 void CudaRuntime::execute() {
+  ThreadCudaContextsGuard guard(ctx_);
+
   for (auto &task : plan_.tasks) {
     std::visit(
-        [&task, ctx = ctx_](auto &kernel) {
+        [&task](auto &kernel) {
           kernel.dtype_shape_infer(task.input_descs.data(),
                                    task.output_descs.data());
-          kernel.execute(task.inputs.data(), task.outputs.data(), ctx);
+          kernel.execute(task.inputs.data(), task.outputs.data());
         },
         task.kernel);
   }
