@@ -42,3 +42,5 @@ crate.from_cargo(
     manifests = ["//tiny_llm/weight_managers/safetensors:Cargo.toml"],
 )
 use_repo(crate, "safetensors_deps")
+
+bazel_dep(name = "google_benchmark", version = "1.9.5")
