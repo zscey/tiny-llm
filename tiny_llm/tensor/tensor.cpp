@@ -155,6 +155,9 @@ auto Tensor::data() const -> const void * {
 
 namespace {
 auto element_size(const std::vector<int64_t> &shape) -> int64_t {
+  if (shape.empty()) {
+    return 0;
+  }
   return std::accumulate(shape.begin(), shape.end(), 1,
                          [](auto a, auto b) { return a * b; });
 }
@@ -192,6 +195,9 @@ void Tensor::copy_to(Tensor &tensor) const {
 
   auto copy_size =
       static_cast<size_t>(element_size(shape_)) * type_size(dtype_);
+  if (copy_size == 0) {
+    return;
+  }
   switch (device_.type) {
 #ifdef TENSOR_WITH_CUDA
   case DeviceType::kCudaHost:

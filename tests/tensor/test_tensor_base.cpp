@@ -46,6 +46,8 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
     EXPECT_TRUE(cur_tensor.shape().empty());
     EXPECT_TRUE(cur_tensor.stride().empty());
     EXPECT_TRUE(cur_tensor.data() == nullptr);
+
+    EXPECT_NO_THROW(void(cur_tensor.to({DeviceType::kCpu})));
   }
 
   cur_tensor = std::move(this->tensor);

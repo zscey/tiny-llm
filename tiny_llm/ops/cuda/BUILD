@@ -23,8 +23,21 @@ cuda_library(
     ],
 )
 
+cuda_library(
+    name = "gemm",
+    srcs = ["gemm.cu"],
+    hdrs = ["gemm.hpp"],
+    deps = [
+        ":cuda_op_common",
+        "//tiny_llm/common:log_and_excepts",
+    ],
+)
+
 cc_library(
     name = "cuda_ops",
     visibility = ["//:__subpackages__"],
-    deps = [":silu"],
+    deps = [
+        ":gemm",
+        ":silu",
+    ],
 )

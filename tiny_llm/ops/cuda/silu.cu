@@ -2,6 +2,8 @@
 
 namespace tiny_llm::cuda {
 namespace {
+constexpr uint32_t kThreadNum = 512;
+
 __global__ void silu_kernel(const float *src, float *dst, size_t size) {
   auto index = (blockIdx.x * blockDim.x) + threadIdx.x;
   if (index < size) {
@@ -14,7 +16,7 @@ void silu(const float *src, float *dst, size_t size) {
   if (size == 0) {
     return;
   }
-  silu_kernel<<<CalBlockNum(size, ThreadNum1d), ThreadNum1d, 0,
+  silu_kernel<<<CalBlockNum(size, kThreadNum), kThreadNum, 0,
                 ThreadCudaContexts::GetContext().stream>>>(src, dst, size);
 }
 } // namespace tiny_llm::cuda
