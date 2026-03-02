@@ -42,10 +42,20 @@ cuda_library(
     ],
 )
 
+cuda_library(
+    name = "embedding",
+    srcs = ["embedding.cu"],
+    hdrs = ["embedding.hpp"],
+    deps = [
+        ":cuda_op_common",
+    ],
+)
+
 cc_library(
     name = "cuda_ops",
     visibility = ["//:__subpackages__"],
     deps = [
+        ":embedding",
         ":gemm",
         ":rope",
         ":silu",
