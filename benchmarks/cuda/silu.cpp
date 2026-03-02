@@ -10,7 +10,7 @@ void bm_silu(benchmark::State &state) {
              {state.range(0), state.range(0)}, true);
   Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
              {state.range(0), state.range(0)}, true);
-  ThreadCudaContexts::GetContext();
+  ThreadCudaContexts::Synchronize();
 
   for (auto _ : state) {
     cuda::silu(src.data<float>(), dst.data<float>(),

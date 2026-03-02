@@ -12,7 +12,7 @@ void bm_gemm_plain(benchmark::State &state) {
                 {state.range(2), state.range(1)}, true);
   Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
              {state.range(0), state.range(2)}, true);
-  ThreadCudaContexts::GetContext();
+  ThreadCudaContexts::Synchronize();
 
   for (auto _ : state) {
     cuda::gemm_row_major_plain(input.data<float>(), weight.data<float>(),
@@ -29,7 +29,7 @@ void bm_gemm(benchmark::State &state) {
                 {state.range(2), state.range(1)}, true);
   Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
              {state.range(0), state.range(2)}, true);
-  ThreadCudaContexts::GetContext();
+  ThreadCudaContexts::Synchronize();
 
   for (auto _ : state) {
     cuda::gemm_row_major(input.data<float>(), weight.data<float>(), nullptr,
