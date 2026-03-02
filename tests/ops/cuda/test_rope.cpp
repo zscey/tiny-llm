@@ -22,7 +22,7 @@ TEST(CudaOps, Rope) {
       static_cast<const float *>(wm.get_tensor("cos").data);
   const auto *cos_ptr = cos.data<float>();
   for (size_t i = 0; i < 192; ++i) {
-    EXPECT_FLOAT_EQ(cos_ptr[i], cos_target_ptr[i]) << i;
+    EXPECT_FLOAT_EQ(cos_ptr[i], cos_target_ptr[i]);
   }
 }
 
