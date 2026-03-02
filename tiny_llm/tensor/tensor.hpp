@@ -7,6 +7,7 @@
 namespace tiny_llm {
 enum class DataType : std::uint8_t {
   kFloat32,
+  kUint32,
 };
 
 auto to_string(DataType dtype) -> std::string;

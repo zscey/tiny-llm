@@ -17,6 +17,8 @@ auto to_string(DataType dtype) -> std::string {
   switch (dtype) {
   case DataType::kFloat32:
     return "Float32";
+  case DataType::kUint32:
+    return "Uint32";
   default:
     return "Unknow";
   }
@@ -25,6 +27,7 @@ auto to_string(DataType dtype) -> std::string {
 auto type_size(DataType dtype) -> size_t {
   switch (dtype) {
   case DataType::kFloat32:
+  case DataType::kUint32:
     return 4;
   default:
     break;

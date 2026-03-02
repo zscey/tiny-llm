@@ -27,10 +27,14 @@ public:
 using TestTypes = ::testing::Types<
     Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32>,
     Types<{.type = DeviceType::kCudaHost, .id = 0}, DataType::kFloat32>,
-    Types<{.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32>>;
+    Types<{.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32>,
+    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kUint32>,
+    Types<{.type = DeviceType::kCudaHost, .id = 0}, DataType::kUint32>,
+    Types<{.type = DeviceType::kCuda, .id = 0}, DataType::kUint32>>;
 #else
 using TestTypes = ::testing::Types<
-    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32>>;
+    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32>,
+    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kUint32>>;
 #endif
 
 TYPED_TEST_SUITE(TensorBaseTest, TestTypes);
@@ -106,6 +110,7 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
     EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
     EXPECT_TRUE(cur_tensor.device().type == this->device.type);
     EXPECT_TRUE(cur_tensor.device().id == this->device.id);
+    // buffer_size >= required_size, ptr not change
     EXPECT_TRUE(cur_tensor.data() == ptr);
     EXPECT_TRUE(cur_tensor.shape() == (std::vector<int64_t>{3, 4, 7, 4}));
     auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
