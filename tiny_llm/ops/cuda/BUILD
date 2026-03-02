@@ -33,11 +33,21 @@ cuda_library(
     ],
 )
 
+cuda_library(
+    name = "rope",
+    srcs = ["rope.cu"],
+    hdrs = ["rope.hpp"],
+    deps = [
+        ":cuda_op_common",
+    ],
+)
+
 cc_library(
     name = "cuda_ops",
     visibility = ["//:__subpackages__"],
     deps = [
         ":gemm",
+        ":rope",
         ":silu",
     ],
 )
