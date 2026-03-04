@@ -7,9 +7,9 @@ namespace tiny_llm {
 namespace {
 void bm_rope(benchmark::State &state) {
   Tensor cos({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-             {state.range(0), state.range(1)}, true);
+             {state.range(0), state.range(1) / 2}, true);
   Tensor sin({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-             {state.range(0), state.range(1)}, true);
+             {state.range(0), state.range(1) / 2}, true);
   ThreadCudaContexts::Synchronize();
 
   for (auto _ : state) {
