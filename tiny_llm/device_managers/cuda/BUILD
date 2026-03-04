@@ -35,3 +35,13 @@ cc_library(
         ":cuda_context",
     ],
 )
+
+cc_library(
+    name = "cuda_device_infos",
+    srcs = ["cuda_device_infos.cpp"],
+    hdrs = ["cuda_device_infos.hpp"],
+    deps = [
+        "//tiny_llm/common:log_and_excepts",
+        "@local_cuda//:cuda_runtime",
+    ],
+)

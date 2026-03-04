@@ -39,6 +39,7 @@ cc_test(
     ] + select({
         "//platforms/device:cuda": [
             "//tiny_llm/device_managers/cuda:cuda_allocator",
+            "//tiny_llm/device_managers/cuda:cuda_device_infos",
             "//tiny_llm/runtime/cuda:cuda_runtime",
         ],
         "//conditions:default": [],
