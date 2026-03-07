@@ -13,7 +13,7 @@ auto runfile_env() -> bazel::tools::cpp::runfiles::Runfiles ** {
 } // namespace
 void BazelRunfile::Initialize(const std::string &exec_path) {
   static std::once_flag flag;
-  std::call_once(flag, [&exec_path]() {
+  std::call_once(flag, [&exec_path]() -> void {
     *runfile_env() = bazel::tools::cpp::runfiles::Runfiles::Create(exec_path);
     TINY_LLM_CHECK(*runfile_env());
   });

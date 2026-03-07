@@ -10,7 +10,7 @@ void SiLUKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
   output_descs[0]->cur_shape = input_descs[0]->cur_shape;
   element_size = std::accumulate(input_descs[0]->cur_shape.begin(),
                                  input_descs[0]->cur_shape.end(), 1,
-                                 [](auto a, auto b) { return a * b; });
+                                 [](auto a, auto b) -> auto { return a * b; });
 }
 
 void SiLUKernel::execute(const void *const *inputs, void *const *outputs) {

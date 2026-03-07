@@ -70,8 +70,9 @@ auto SafeTensorWeightManager::get_tensor(const std::string &name) -> SliceView {
             .shape = tensor.shape(),
             .data = tensor.data(),
             .data_len =
-                std::accumulate(tensor.shape().begin(), tensor.shape().end(), 1,
-                                [](int64_t a, int64_t b) { return a * b; }) *
+                std::accumulate(
+                    tensor.shape().begin(), tensor.shape().end(), 1,
+                    [](int64_t a, int64_t b) -> int64_t { return a * b; }) *
                 type_size(tensor.dtype())};
   }
 
@@ -85,11 +86,11 @@ void SafeTensorWeightManager::set_tensor(std::string name,
                                          SliceView slice_view) {
   TINY_LLM_CHECK(slice_view.data != nullptr);
   TINY_LLM_CHECK(slice_view.data_len > 0);
-  TINY_LLM_CHECK(std::accumulate(slice_view.shape.begin(),
-                                 slice_view.shape.end(), 1,
-                                 [](int64_t a, int64_t b) { return a * b; }) *
-                     type_size(slice_view.dtype) ==
-                 slice_view.data_len);
+  TINY_LLM_CHECK(
+      std::accumulate(slice_view.shape.begin(), slice_view.shape.end(), 1,
+                      [](int64_t a, int64_t b) -> int64_t { return a * b; }) *
+          type_size(slice_view.dtype) ==
+      slice_view.data_len);
 
   auto &tensor =
       user_defined_weights_

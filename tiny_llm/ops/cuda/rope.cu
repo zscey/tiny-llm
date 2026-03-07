@@ -40,8 +40,8 @@ __global__ void apply_rope_inplace_kernel(const float *cos, const float *sin,
       auto *imaginary_ptr = real_ptr + half_dim;
       auto real = *real_ptr;
       auto imaginary = *imaginary_ptr;
-      *real_ptr = cos_factor * real - sin_factor * imaginary;
-      *imaginary_ptr = sin_factor * real + cos_factor * imaginary;
+      *real_ptr = (cos_factor * real) - (sin_factor * imaginary);
+      *imaginary_ptr = (sin_factor * real) + (cos_factor * imaginary);
 
       real_ptr += static_cast<size_t>(half_dim * 2);
     }
@@ -51,9 +51,8 @@ __global__ void apply_rope_inplace_kernel(const float *cos, const float *sin,
 
 void rope(float *cos_dst, float *sin_dst, uint32_t max_len, uint32_t dim,
           double base) {
-  if (max_len == 0 || dim == 0) {
-    return;
-  }
+  TINY_LLM_CHECK(max_len > 0);
+  TINY_LLM_CHECK(dim > 0);
   TINY_LLM_CHECK((dim & 1U) == 0);
 
   auto half_dim = dim / 2;
@@ -65,10 +64,11 @@ void rope(float *cos_dst, float *sin_dst, uint32_t max_len, uint32_t dim,
 void apply_rope_inplace(const float *cos, const float *sin,
                         const uint32_t *position_ids, float *dst,
                         size_t element_size, uint32_t head_num, uint32_t dim) {
-  if (head_num == 0 || dim == 0) {
+  if (element_size == 0) {
     return;
   }
   TINY_LLM_CHECK(head_num > 0);
+  TINY_LLM_CHECK(dim > 0);
   TINY_LLM_CHECK((dim & 1U) == 0);
 
   auto half_dim = dim / 2;

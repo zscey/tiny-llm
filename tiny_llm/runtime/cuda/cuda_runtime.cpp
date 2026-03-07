@@ -16,7 +16,7 @@ constexpr size_t kAlign = 256;
 auto element_num(const std::vector<size_t> &shape) -> size_t {
   return std::accumulate(
       shape.begin(), shape.end(), 1,
-      [](const auto &left, const auto &right) { return left * right; });
+      [](const auto &left, const auto &right) -> auto { return left * right; });
 }
 
 struct Relation {
@@ -27,7 +27,7 @@ struct Relation {
 auto is_output(const CudaPlan &cuda_plan, const CudaPlan::TaskIO &task_io)
     -> bool {
   return std::ranges::any_of(
-      cuda_plan.output_infos, [&task_io](const auto &named_info) {
+      cuda_plan.output_infos, [&task_io](const auto &named_info) -> auto {
         return named_info.second.second.task_id == task_io.task_id &&
                named_info.second.second.io_id == task_io.io_id;
       });
@@ -123,9 +123,9 @@ template <typename From, typename To>
 auto vector_convert(const std::vector<From> &from) -> std::vector<To> {
   std::vector<To> to;
   to.reserve(from.size());
-  std::ranges::transform(from, std::back_inserter(to), [](const auto &elem) {
-    return static_cast<To>(elem);
-  });
+  std::ranges::transform(
+      from, std::back_inserter(to),
+      [](const auto &elem) -> auto { return static_cast<To>(elem); });
   return to;
 }
 
@@ -172,7 +172,7 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
   std::vector<std::string> res;
   res.reserve(input_ptrs_.size());
   std::ranges::transform(input_ptrs_, std::back_inserter(res),
-                         [](const auto &elem) { return elem.first; });
+                         [](const auto &elem) -> auto { return elem.first; });
   return res;
 }
 
@@ -181,7 +181,7 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
   std::vector<std::string> res;
   res.reserve(plan_.output_infos.size());
   std::ranges::transform(plan_.output_infos, std::back_inserter(res),
-                         [](const auto &elem) { return elem.first; });
+                         [](const auto &elem) -> auto { return elem.first; });
   return res;
 }
 
@@ -264,7 +264,7 @@ void CudaRuntime::execute() {
 
   for (auto &task : plan_.tasks) {
     std::visit(
-        [&task](auto &kernel) {
+        [&task](auto &kernel) -> auto {
           kernel.dtype_shape_infer(task.input_descs.data(),
                                    task.output_descs.data());
           kernel.execute(task.inputs.data(), task.outputs.data());

@@ -59,17 +59,19 @@ void Graph::add_node(const std::string &name, const NodeIONames &node_io_names,
 }
 
 void Graph::set_input_names(std::unordered_set<std::string> input_names) {
-  TINY_LLM_CHECK(std::ranges::all_of(input_names, [this](const auto &name) {
-    return tensor_name_to_idx.contains(name);
-  }))
+  TINY_LLM_CHECK(
+      std::ranges::all_of(input_names, [this](const auto &name) -> auto {
+        return tensor_name_to_idx.contains(name);
+      }))
 
   this->input_names = std::move(input_names);
 }
 
 void Graph::set_output_names(std::unordered_set<std::string> output_names) {
-  TINY_LLM_CHECK(std::ranges::all_of(output_names, [this](const auto &name) {
-    return tensor_name_to_idx.contains(name);
-  }))
+  TINY_LLM_CHECK(
+      std::ranges::all_of(output_names, [this](const auto &name) -> auto {
+        return tensor_name_to_idx.contains(name);
+      }))
 
   this->output_names = std::move(output_names);
 }
@@ -87,9 +89,9 @@ auto is_valid_map(const std::unordered_map<std::string, uint32_t> &map)
     exist[id] = 1;
   }
 
-  return std::accumulate(exist.begin(), exist.end(), 0, [](auto a, auto b) {
-           return a + b;
-         }) == static_cast<int32_t>(map_size);
+  return std::accumulate(exist.begin(), exist.end(), 0,
+                         [](auto a, auto b) -> auto { return a + b; }) ==
+         static_cast<int32_t>(map_size);
 }
 } // namespace
 
@@ -101,7 +103,7 @@ auto is_valid(const Graph &g) -> bool {
       g.node_name_to_idx.size() != g.nodes.size() ||
       std::ranges::any_of(
           g.tensor_infos,
-          [&g](const auto &named_tensor_info) {
+          [&g](const auto &named_tensor_info) -> auto {
             if (!named_tensor_info) {
               return true;
             }
@@ -111,25 +113,25 @@ auto is_valid(const Graph &g) -> bool {
             return !g.tensor_name_to_idx.contains(named_tensor_info->first) ||
                    std::ranges::any_of(
                        tensor_info.consumer_nodes,
-                       [size](auto id) { return id >= size; }) ||
+                       [size](auto id) -> auto { return id >= size; }) ||
                    (producer_node && *producer_node >= size) ||
                    (!producer_node && !tensor_info.has_explicit_added);
           }) ||
       std::ranges::any_of(
           g.nodes,
-          [&g](const auto &named_node) {
+          [&g](const auto &named_node) -> auto {
             if (!named_node) {
               return true;
             }
             auto size = g.tensor_infos.size();
-            auto pred = [size](auto id) { return id >= size; };
+            auto pred = [size](auto id) -> auto { return id >= size; };
             return !g.node_name_to_idx.contains(named_node->first) ||
                    std::ranges::any_of(named_node->second.input_tensors,
                                        pred) ||
                    std::ranges::any_of(named_node->second.output_tensors, pred);
           }) ||
       std::ranges::any_of(g.input_names,
-                          [&g](const auto &name) {
+                          [&g](const auto &name) -> auto {
                             const auto idx_iter =
                                 g.tensor_name_to_idx.find(name);
                             if (idx_iter == g.tensor_name_to_idx.end()) {
@@ -140,7 +142,7 @@ auto is_valid(const Graph &g) -> bool {
                             return tensor_info.producer_node ||
                                    tensor_info.consumer_nodes.empty();
                           }) ||
-      std::ranges::any_of(g.output_names, [&g](const auto &name) {
+      std::ranges::any_of(g.output_names, [&g](const auto &name) -> auto {
         const auto idx_iter = g.tensor_name_to_idx.find(name);
         if (idx_iter == g.tensor_name_to_idx.end()) {
           return true;
@@ -176,7 +178,7 @@ auto is_valid(const Graph &g) -> bool {
   }
 
   return std::ranges::all_of(
-      g.output_names, [&is_visited, &g](const auto &name) {
+      g.output_names, [&is_visited, &g](const auto &name) -> auto {
         return is_visited.at(g.tensor_name_to_idx.at(name));
       });
 }
