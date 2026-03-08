@@ -10,7 +10,7 @@ cc_library(
     ],
     deps = [
         "//tiny_llm/device_managers/cuda:cuda_context",
-        "@local_cuda//:cuda_runtime",
+        "@cuda//:cuda_runtime",
     ],
 )
 
@@ -48,6 +48,7 @@ cuda_library(
     hdrs = ["embedding.hpp"],
     deps = [
         ":cuda_op_common",
+        "//tiny_llm/common:log_and_excepts",
     ],
 )
 

@@ -70,7 +70,7 @@ auto shape_to_stride(const std::vector<int64_t> &shape, DataType dtype)
 }
 
 auto is_valid_shape(const std::vector<int64_t> &shape) -> bool {
-  return std::ranges::all_of(shape, [](auto elem) { return elem > 0; });
+  return std::ranges::all_of(shape, [](auto elem) -> auto { return elem > 0; });
 }
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto is_valid_shape_and_stride(const std::vector<int64_t> &shape,
@@ -162,7 +162,7 @@ auto element_size(const std::vector<int64_t> &shape) -> int64_t {
     return 0;
   }
   return std::accumulate(shape.begin(), shape.end(), 1,
-                         [](auto a, auto b) { return a * b; });
+                         [](auto a, auto b) -> auto { return a * b; });
 }
 } // namespace
 

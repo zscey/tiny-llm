@@ -9,7 +9,7 @@ cc_library(
     deps = [
         "//tiny_llm/common:common_macros",
         "//tiny_llm/common:log_and_excepts",
-        "@local_cuda//:cuda_runtime",
+        "@cuda//:cuda_runtime",
     ],
 )
 
@@ -42,6 +42,6 @@ cc_library(
     hdrs = ["cuda_device_infos.hpp"],
     deps = [
         "//tiny_llm/common:log_and_excepts",
-        "@local_cuda//:cuda_runtime",
+        "@cuda//:cuda_runtime",
     ],
 )

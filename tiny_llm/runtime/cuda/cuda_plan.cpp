@@ -8,7 +8,7 @@
 namespace tiny_llm::cuda {
 namespace {
 const auto kKernelGenerator = Visitor{
-    [](const SiLUParam &) { return SiLUKernel{}; },
+    [](const SiLUParam &) -> SiLUKernel { return SiLUKernel{}; },
 };
 
 enum class Status : std::uint8_t {
@@ -64,9 +64,9 @@ template <typename From, typename To>
 auto vector_convert(const std::vector<From> &from) -> std::vector<To> {
   std::vector<To> to;
   to.reserve(from.size());
-  std::ranges::transform(from, std::back_inserter(to), [](const auto &elem) {
-    return static_cast<To>(elem);
-  });
+  std::ranges::transform(
+      from, std::back_inserter(to),
+      [](const auto &elem) -> auto { return static_cast<To>(elem); });
   return to;
 }
 
@@ -131,8 +131,8 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id,
             .emplace_back(task_id, input_id);
       } else {
         // is initializer
-        TINY_LLM_CHECK(std::ranges::all_of(graph_tensor_info.shape,
-                                           [](auto s) { return s > 0; }));
+        TINY_LLM_CHECK(std::ranges::all_of(
+            graph_tensor_info.shape, [](auto s) -> auto { return s > 0; }));
         plan_tensor_desc.cur_shape =
             vector_convert<int64_t, size_t>(graph_tensor_info.shape);
       }
@@ -146,7 +146,7 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id,
   auto &cur_task = plan.tasks.back();
   std::visit(
       [input_descs = cur_task.input_descs.data(),
-       output_descs = cur_task.output_descs.data()](auto &kernel) {
+       output_descs = cur_task.output_descs.data()](auto &kernel) -> auto {
         kernel.dtype_shape_infer(input_descs, output_descs);
       },
       cur_task.kernel);

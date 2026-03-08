@@ -1,4 +1,4 @@
-#include "cuda_op_common.hpp"
+#include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/ops/cuda/embedding.hpp"
 
 namespace tiny_llm::cuda {
@@ -31,9 +31,11 @@ __global__ void embedding_kernel(const uint32_t *src, const float *emb_weights,
 
 void embedding(const uint32_t *src, const float *emb_weights, float *dst,
                uint32_t dim, size_t element_size) {
-  if (element_size == 0 || dim == 0) {
+  if (element_size == 0) {
     return;
   }
+
+  TINY_LLM_CHECK(dim > 0);
 
   auto padded_dim = CalBlockNum(dim, kTile) * kTile;
   embedding_kernel<<<CalBlockNum(element_size * padded_dim,
