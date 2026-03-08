@@ -213,6 +213,8 @@ void CudaRuntime::bind_input(const std::string &name, const Tensor &tensor) {
 
 void CudaRuntime::cpu_tensor_copy_to_input(const std::string &name,
                                            const Tensor &tensor) {
+  ThreadCudaContextsGuard guard(ctx_);
+
   TINY_LLM_CHECK((tensor.device().type == DeviceType::kCudaHost ||
                   tensor.device().type == DeviceType::kCpu));
   check_input(*this, name, tensor);
@@ -238,6 +240,8 @@ void CudaRuntime::cpu_tensor_copy_to_input(const std::string &name,
 
 void CudaRuntime::output_copy_to_cpu_tensor(const std::string &name,
                                             Tensor &tensor) const {
+  ThreadCudaContextsGuard guard(ctx_);
+
   TINY_LLM_CHECK((tensor.device().type == DeviceType::kCudaHost ||
                   tensor.device().type == DeviceType::kCpu));
   TINY_LLM_CHECK(plan_.output_infos.contains(name));
