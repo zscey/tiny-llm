@@ -16,7 +16,11 @@ public:
    */
   static auto MaxSharedMemPerBlock(int32_t dev_id = -1) -> size_t;
 
+  static auto SharedMemPerBlockOptin(int32_t dev_id = -1) -> size_t;
+
 private:
+  friend auto get_cuda_dev_prop(int32_t dev_id) -> const cudaDeviceProp &;
+
   CudaDeviceInfos();
   static auto Instance() -> const CudaDeviceInfos &;
 

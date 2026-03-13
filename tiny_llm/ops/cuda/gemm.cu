@@ -19,8 +19,8 @@ __global__ void gemm_row_major_plain_no_bias_kernel(const float *input,
 
   if (cur_y < m && cur_x < n) {
     float res{};
-    const auto *base_input_ptr = input + static_cast<size_t>(cur_y * d);
-    const auto *base_weight_ptr = weight + static_cast<size_t>(cur_x * d);
+    const auto *base_input_ptr = input + (static_cast<size_t>(cur_y) * d);
+    const auto *base_weight_ptr = weight + (static_cast<size_t>(cur_x) * d);
     for (uint32_t i = 0; i < d; ++i) {
       res += base_input_ptr[i] * base_weight_ptr[i];
     }
@@ -55,7 +55,7 @@ __global__ void gemm_row_major_no_bias_kernel(const float *input,
 
     for (uint32_t ty = 0; ty < kTileY; ++ty) {
       input_buffer[threadIdx.y][(ty * kBlockSize) + threadIdx.x] = 0;
-      auto input_row = base_y + (threadIdx.y * kTileY) + ty;
+      auto input_row = base_y + (ty * kBlockSize) + threadIdx.y;
       if (buffer_col < d && input_row < m) {
         input_buffer[threadIdx.y][(ty * kBlockSize) + threadIdx.x] =
             input[(input_row * d) + buffer_col];
@@ -63,7 +63,7 @@ __global__ void gemm_row_major_no_bias_kernel(const float *input,
     }
     for (uint32_t tx = 0; tx < kTileX; ++tx) {
       weight_buffer[threadIdx.y][(tx * kBlockSize) + threadIdx.x] = 0;
-      auto weight_row = base_x + (threadIdx.y * kTileX) + tx;
+      auto weight_row = base_x + (tx * kBlockSize) + threadIdx.y;
       if (buffer_col < d && weight_row < n) {
         weight_buffer[threadIdx.y][(tx * kBlockSize) + threadIdx.x] =
             weight[(weight_row * d) + buffer_col];
@@ -89,9 +89,9 @@ __global__ void gemm_row_major_no_bias_kernel(const float *input,
   }
 
   for (uint32_t ty = 0; ty < kTileY; ++ty) {
-    auto dst_row = base_y + (threadIdx.y * kTileY) + ty;
+    auto dst_row = base_y + (ty * kBlockSize) + threadIdx.y;
     for (uint32_t tx = 0; tx < kTileX; ++tx) {
-      auto dst_col = base_x + (threadIdx.x * kTileX) + tx;
+      auto dst_col = base_x + (tx * kBlockSize) + threadIdx.x;
       if (dst_row < m && dst_col < n) {
         dst[(dst_row * n) + dst_col] = res[ty][tx];
       }

@@ -4,5 +4,7 @@
 namespace tiny_llm {
 TEST(DeviceManager, CudaDeviceInfos) {
   EXPECT_TRUE(CudaDeviceInfos::MaxSharedMemPerBlock() > 0);
+  EXPECT_TRUE(CudaDeviceInfos::SharedMemPerBlockOptin() >=
+              CudaDeviceInfos::MaxSharedMemPerBlock());
 }
 } // namespace tiny_llm

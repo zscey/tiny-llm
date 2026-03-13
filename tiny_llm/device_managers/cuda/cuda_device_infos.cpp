@@ -17,15 +17,22 @@ auto CudaDeviceInfos::Instance() -> const CudaDeviceInfos & {
   return device_infos;
 }
 
-auto CudaDeviceInfos::MaxSharedMemPerBlock(int32_t dev_id) -> size_t {
-  const auto &device_infos = Instance();
+auto get_cuda_dev_prop(int32_t dev_id) -> const cudaDeviceProp & {
+  const auto &device_infos = CudaDeviceInfos::Instance();
 
   if (dev_id < 0) {
     TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
   }
   TINY_LLM_CHECK(static_cast<size_t>(dev_id) <
                  device_infos.device_props_.size());
+  return device_infos.device_props_.at(dev_id);
+}
 
-  return device_infos.device_props_.at(dev_id).sharedMemPerBlock;
+auto CudaDeviceInfos::MaxSharedMemPerBlock(int32_t dev_id) -> size_t {
+  return get_cuda_dev_prop(dev_id).sharedMemPerBlock;
+}
+
+auto CudaDeviceInfos::SharedMemPerBlockOptin(int32_t dev_id) -> size_t {
+  return get_cuda_dev_prop(dev_id).sharedMemPerBlockOptin;
 }
 } // namespace tiny_llm

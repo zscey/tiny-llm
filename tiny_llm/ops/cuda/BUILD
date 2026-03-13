@@ -52,11 +52,25 @@ cuda_library(
     ],
 )
 
+cuda_library(
+    name = "flash_attention",
+    srcs = ["flash_attention.cu"],
+    hdrs = ["flash_attention.hpp"],
+    deps = [
+        ":cuda_op_common",
+        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/device_managers/cuda:cuda_device_infos",
+        "@cuda//:cub",
+        "@cuda//:libcudacxx",
+    ],
+)
+
 cc_library(
     name = "cuda_ops",
     visibility = ["//:__subpackages__"],
     deps = [
         ":embedding",
+        ":flash_attention",
         ":gemm",
         ":rope",
         ":silu",
