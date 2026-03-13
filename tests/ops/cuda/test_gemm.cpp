@@ -1,5 +1,7 @@
 #include "tiny_llm/ops/cuda/gemm.hpp"
 #include "tiny_llm/tensor/tensor.hpp"
+#include "tiny_llm/utils/runfile.hpp"
+#include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
 
 namespace tiny_llm {
@@ -84,10 +86,15 @@ TEST(CudaOps, Gemm) {
 
   ThreadCudaContexts::Synchronize();
 
+  SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/gemm_m127d255n353.safetensors"));
   const auto *dst_plain_ptr = cpu_dst_plain.data<float>();
   const auto *dst_ptr = cpu_dst.data<float>();
+  const auto *target_ptr =
+      reinterpret_cast<const float *>(wm.get_tensor("res").data);
   for (size_t i = 0, i_end = static_cast<size_t>(m * n); i < i_end; ++i) {
-    EXPECT_FLOAT_EQ(dst_plain_ptr[i], dst_ptr[i]);
+    EXPECT_FLOAT_EQ(dst_plain_ptr[i], target_ptr[i]);
+    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]);
   }
 }
 } // namespace tiny_llm
