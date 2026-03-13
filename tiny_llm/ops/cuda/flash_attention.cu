@@ -71,7 +71,7 @@ __device__ auto get_local_s_m_l(const float *query, const float *key,
 
 /**
  * value: v_length rows of value
- * global_o: size if ceil(dim / kWarpSize)
+ * global_o: size: ceil(dim / kWarpSize)
  */
 __device__ auto set_global_m_l_o(const float *value, const float2 &local_m_l,
                                  const float *local_s, float &global_m,

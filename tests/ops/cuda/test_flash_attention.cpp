@@ -7,9 +7,9 @@
 namespace tiny_llm {
 TEST(CudaOps, Func) {
   uint32_t batch = 2;
-  uint32_t q_length = 1013;
+  uint32_t q_length = 107;
   uint32_t q_head = 4;
-  uint32_t kv_length = 2019;
+  uint32_t kv_length = 123;
   uint32_t kv_head = 2;
   uint32_t dim = 61;
 
@@ -52,8 +52,8 @@ TEST(CudaOps, Func) {
     dst = dst.to({.type = DeviceType::kCpu, .id = 0});
     ThreadCudaContexts::Synchronize();
 
-    SafeTensorWeightManager wm("/home/haol/code-dir/attention-test/"
-                               "attn_res_b2q1013h4k2019h2d61.safetensors");
+    SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+        "tiny_llm/tests/datas/attn_res_b2q107h4k123h2d61.safetensors"));
     const auto *dst_ptr = dst.data<float>();
     const auto *target_ptr =
         reinterpret_cast<const float *>(wm.get_tensor("res").data);

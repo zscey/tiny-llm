@@ -1,5 +1,6 @@
 #include "tiny_llm/ops/cuda/gemm.hpp"
 #include "tiny_llm/tensor/tensor.hpp"
+#include "tiny_llm/utils/runfile.hpp"
 #include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
 
@@ -85,8 +86,8 @@ TEST(CudaOps, Gemm) {
 
   ThreadCudaContexts::Synchronize();
 
-  SafeTensorWeightManager wm("/home/haol/code-dir/attention-test/"
-                             "gemm_m127d255n353.safetensors");
+  SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/gemm_m127d255n353.safetensors"));
   const auto *dst_plain_ptr = cpu_dst_plain.data<float>();
   const auto *dst_ptr = cpu_dst.data<float>();
   const auto *target_ptr =
