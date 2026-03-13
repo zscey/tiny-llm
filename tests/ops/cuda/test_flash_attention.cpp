@@ -60,7 +60,7 @@ TEST(CudaOps, Func) {
     for (size_t i = 0,
                 i_end = static_cast<size_t>(batch) * q_length * q_head * dim;
          i < i_end; ++i) {
-      EXPECT_TRUE(std::abs(dst_ptr[i] - target_ptr[i]) < 1e-5F) << i;
+      EXPECT_TRUE(std::abs(dst_ptr[i] - target_ptr[i]) < 1e-5F);
     }
   }
 }
