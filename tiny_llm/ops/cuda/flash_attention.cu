@@ -46,24 +46,34 @@ __device__ void fetch_data(const float *from, float *to, uint32_t row_num,
  * query: single row of query
  * key: key_length rows of key
  */
+template <bool IsCausal>
 __device__ auto get_local_s_m_l(const float *query, const float *key,
                                 float *local_s, uint32_t key_length,
-                                uint32_t dim, uint32_t key_step) -> float2 {
+                                uint32_t dim, uint32_t key_step,
+                                uint32_t base_q_idx, uint32_t base_key_idx)
+    -> float2 {
   float local_m = -CUDART_INF_F;
   float local_l{};
   for (uint32_t thread_iter = 0; thread_iter < kThreadIterPerKV;
        ++thread_iter) {
     auto cur_row_k = (thread_iter * kWarpSize) + (threadIdx.x % kWarpSize);
-    if (cur_row_k < key_length) {
-      const auto *cur_key = key + (static_cast<size_t>(cur_row_k) * key_step);
-      auto &cur_s = local_s[thread_iter];
-      cur_s = 0.F;
-      for (uint32_t i = 0; i < dim; ++i) {
-        cur_s += query[i] * cur_key[i];
-      }
-      local_m = ::max(local_m, cur_s);
-      local_l += ::expf(cur_s);
+    if (cur_row_k >= key_length) {
+      continue;
     }
+    if constexpr (IsCausal) {
+      if (base_q_idx < (base_key_idx + cur_row_k)) {
+        local_s[thread_iter] = -CUDART_INF_F;
+        continue;
+      }
+    }
+    const auto *cur_key = key + (static_cast<size_t>(cur_row_k) * key_step);
+    auto &cur_s = local_s[thread_iter];
+    cur_s = 0.F;
+    for (uint32_t i = 0; i < dim; ++i) {
+      cur_s += query[i] * cur_key[i];
+    }
+    local_m = ::max(local_m, cur_s);
+    local_l += ::expf(cur_s);
   }
 
   return ::make_float2(local_m, local_l);
@@ -109,7 +119,7 @@ __device__ auto set_global_m_l_o(const float *value, const float2 &local_m_l,
   global_l = cur_l;
 }
 
-template <uint32_t OutPerThread>
+template <uint32_t OutPerThread, bool IsCausal>
 __global__ void
 flash_attn_kernel(const float *query, const float *key, const float *value,
                   float *dst, uint32_t q_length, uint32_t kv_length,
@@ -158,11 +168,12 @@ flash_attn_kernel(const float *query, const float *key, const float *value,
 
     for (uint32_t warp_iter = 0; warp_iter * kWarpNumPerBlock < q_row_num;
          ++warp_iter) {
-      auto local_m_l = get_local_s_m_l(
-          query_buffer + (static_cast<size_t>((warp_iter * kWarpNumPerBlock) +
-                                              (threadIdx.x / kWarpSize)) *
-                          padded_dim),
-          key_buffer, &local_s[0], kv_row_num, dim, padded_dim);
+      auto query_buffer_row =
+          (warp_iter * kWarpNumPerBlock) + (threadIdx.x / kWarpSize);
+      float2 local_m_l = get_local_s_m_l<IsCausal>(
+          query_buffer + (static_cast<size_t>(query_buffer_row) * padded_dim),
+          key_buffer, &local_s[0], kv_row_num, dim, padded_dim,
+          (blockIdx.x * kTileQ) + query_buffer_row, (kv_block_idx * kTileKV));
 
       local_m_l.x =
           ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
@@ -199,13 +210,13 @@ flash_attn_kernel(const float *query, const float *key, const float *value,
 } // namespace
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define CALL_KERNEL(OutPerThread)                                              \
+#define CALL_KERNEL(OutPerThread, IsCausal)                                    \
   cudaFuncSetAttribute(                                                        \
-      flash_attn_kernel<OutPerThread>,                                         \
+      flash_attn_kernel<OutPerThread, IsCausal>,                               \
       cudaFuncAttributeMaxDynamicSharedMemorySize,                             \
       static_cast<int32_t>(                                                    \
           CudaDeviceInfos::SharedMemPerBlockOptin(context.id)));               \
-  flash_attn_kernel<OutPerThread>                                              \
+  flash_attn_kernel<OutPerThread, IsCausal>                                    \
       <<<dim3{CalBlockNum(q_length, kTileQ), q_head, batch},                   \
          kThreadNumPerBlock, share_mem_size, context.stream>>>(                \
           query, key, value, dst, q_length, kv_length, dim, q_head, kv_head);
@@ -213,7 +224,7 @@ flash_attn_kernel(const float *query, const float *key, const float *value,
 void flash_attn(const float *query, const float *key, const float *value,
                 float *dst, uint32_t batch, uint32_t q_length,
                 uint32_t kv_length, uint32_t dim, uint32_t q_head,
-                uint32_t kv_head) {
+                uint32_t kv_head, AttentionType attn_type) {
   TINY_LLM_CHECK(batch > 0);
   TINY_LLM_CHECK(q_length > 0);
   TINY_LLM_CHECK(kv_length > 0);
@@ -231,19 +242,40 @@ void flash_attn(const float *query, const float *key, const float *value,
         "The requested shared memory ({}) exceeds the allocatable limit ({}).",
         share_mem_size, CudaDeviceInfos::SharedMemPerBlockOptin(context.id));
   }
-  TINY_LLM_CHECK(share_mem_size);
 
-  if (dim <= 64) {
-    CALL_KERNEL(2);
-    return;
+  switch (attn_type) {
+  case AttentionType::kNoMask: {
+    if (dim <= 64) {
+      CALL_KERNEL(2, false);
+      return;
+    }
+    if (dim <= 128) {
+      CALL_KERNEL(4, false);
+      return;
+    }
+    if (dim <= 256) {
+      CALL_KERNEL(8, false);
+      return;
+    }
+    break;
   }
-  if (dim <= 128) {
-    CALL_KERNEL(4);
-    return;
+  case AttentionType::kCausalMask: {
+    if (dim <= 64) {
+      CALL_KERNEL(2, true);
+      return;
+    }
+    if (dim <= 128) {
+      CALL_KERNEL(4, true);
+      return;
+    }
+    if (dim <= 256) {
+      CALL_KERNEL(8, true);
+      return;
+    }
+    break;
   }
-  if (dim <= 256) {
-    CALL_KERNEL(8);
-    return;
+  default:
+    break;
   }
 
   TINY_LLM_THROW_ERROR(std::runtime_error,
