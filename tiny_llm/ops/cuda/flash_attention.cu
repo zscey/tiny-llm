@@ -9,9 +9,9 @@ namespace tiny_llm::cuda {
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)
 namespace {
 constexpr uint32_t kWarpSize = 32;
-constexpr uint32_t kWarpNumPerBlock = 32;
+constexpr uint32_t kWarpNumPerBlock = 16;
 constexpr uint32_t kThreadNumPerBlock = kWarpNumPerBlock * kWarpSize;
-constexpr uint32_t kWarpIterPerTileQ = 2;
+constexpr uint32_t kWarpIterPerTileQ = 4;
 constexpr uint32_t kTileQ = kWarpIterPerTileQ * kWarpNumPerBlock;
 constexpr uint32_t kThreadIterPerKV = 2;
 constexpr uint32_t kTileKV = kThreadIterPerKV * kWarpSize;

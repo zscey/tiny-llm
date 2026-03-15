@@ -65,6 +65,18 @@ cuda_library(
     ],
 )
 
+cuda_library(
+    name = "norm",
+    srcs = ["norm.cu"],
+    hdrs = ["norm.hpp"],
+    deps = [
+        ":cuda_op_common",
+        "//tiny_llm/common:log_and_excepts",
+        "@cuda//:cub",
+        "@cuda//:libcudacxx",
+    ],
+)
+
 cc_library(
     name = "cuda_ops",
     visibility = ["//:__subpackages__"],
@@ -72,6 +84,7 @@ cc_library(
         ":embedding",
         ":flash_attention",
         ":gemm",
+        ":norm",
         ":rope",
         ":silu",
     ],
