@@ -3,7 +3,6 @@
 #include <numeric>
 
 namespace tiny_llm {
-namespace {
 struct SliceViewRaw {
   uint32_t dtype;
   size_t shape[8];
@@ -12,6 +11,7 @@ struct SliceViewRaw {
   size_t data_len;
 };
 
+namespace {
 auto u32_to_dtype(uint32_t dtype) -> DataType {
   if (dtype == 15) {
     return DataType::kFloat32;

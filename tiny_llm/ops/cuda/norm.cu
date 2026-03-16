@@ -2,7 +2,6 @@
 #include "cccl/cuda/warp"
 #include "cub/cub.cuh"
 #include "cuda_op_common.hpp"
-#include "math_constants.h"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/ops/cuda/norm.hpp"
 
@@ -17,7 +16,8 @@ constexpr uint32_t kThreadNum = kWarpNumPerBlock * kWarpSize;
 
 template <uint32_t OutPerThread>
 __global__ void rms_norm_kernel(const float *input, const float *weight,
-                                float *dst, size_t element_size, uint32_t dim) {
+                                float *dst, size_t element_size, uint32_t dim,
+                                float eps) {
   // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
   extern __shared__ float buffer[];
   for (size_t cur_idx = threadIdx.x; cur_idx < dim; cur_idx += blockDim.x) {
@@ -46,7 +46,7 @@ __global__ void rms_norm_kernel(const float *input, const float *weight,
 
     rms = ::sqrt(::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
                      .Sum(rms) +
-                 CUDART_MIN_DENORM_F);
+                 eps);
     rms = ::cuda::device::warp_shuffle_idx(rms, 0);
 
     auto *cur_dst = dst + (cur_row * dim);
@@ -63,10 +63,10 @@ __global__ void rms_norm_kernel(const float *input, const float *weight,
   rms_norm_kernel<OutPerThread>                                                \
       <<<CalBlockNum(element_size, kBlockSize), kThreadNum,                    \
          sizeof(float) * dim, ThreadCudaContexts::GetContext().stream>>>(      \
-          input, weight, dst, element_size, dim);
+          input, weight, dst, element_size, dim, eps);
 
 void rms_norm(const float *input, const float *weight, float *dst,
-              size_t element_size, uint32_t dim) {
+              size_t element_size, uint32_t dim, float eps) {
   if (element_size == 0) {
     return;
   }

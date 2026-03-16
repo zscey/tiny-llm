@@ -1,0 +1,11 @@
+[package]
+name = "tokenizers_ffi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+
+[dependencies]
+tokenizers = "0.22.2"

@@ -31,7 +31,7 @@ TEST(CudaOps, RMSNorm) {
   Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
              {b, l, d});
   cuda::rms_norm(input.data<float>(), weight.data<float>(), dst.data<float>(),
-                 b * l, d);
+                 b * l, d, 1.192e-7F);
   dst = dst.to({.type = DeviceType::kCpu, .id = 0});
 
   ThreadCudaContexts::Synchronize();
