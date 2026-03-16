@@ -2,7 +2,6 @@
 #include "tiny_llm/common/log_and_excepts.hpp"
 
 namespace tiny_llm {
-namespace {
 struct TokenizerEncodeResult {
   uint32_t *token_ids;
   size_t len;
@@ -12,7 +11,6 @@ struct TokenizerDecodeResult {
   char *token;
   size_t len;
 };
-} // namespace
 } // namespace tiny_llm
 
 extern "C" {
@@ -49,7 +47,12 @@ auto HuggingfaceTokenizer::operator=(HuggingfaceTokenizer &&other) noexcept
   return *this;
 }
 
-HuggingfaceTokenizer::~HuggingfaceTokenizer() { tokenizer_free(handle_); }
+HuggingfaceTokenizer::~HuggingfaceTokenizer() {
+  if (handle_ != nullptr) {
+    tokenizer_free(handle_);
+    handle_ = nullptr;
+  }
+}
 
 auto HuggingfaceTokenizer::encode(const std::string &token,
                                   bool add_special_tokens)
