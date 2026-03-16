@@ -4,9 +4,8 @@
 
 namespace tiny_llm {
 TEST(Tokenizers, Huggingface) {
-  TokenizerManagerWrapper wrapper(
-      HuggingfaceTokenizer(utils::BazelRunfile::RLocation(
-          "tiny_llm/tests/datas/bert_base_uncased_tokenizer.json")));
+  TokenizerWrapper wrapper(HuggingfaceTokenizer(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/bert_base_uncased_tokenizer.json")));
   EXPECT_EQ(wrapper.get_vocab_size(), 30522);
   std::string text("replace me by any text you'd like.");
 

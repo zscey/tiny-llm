@@ -72,4 +72,6 @@ auto HuggingfaceTokenizer::decode(const std::vector<uint32_t> &ids,
 auto HuggingfaceTokenizer::get_vocab_size() -> size_t {
   return tokenizer_vocab_size(handle_);
 }
+
+static_assert(Tokenizer<HuggingfaceTokenizer>);
 } // namespace tiny_llm
