@@ -13,6 +13,7 @@ cc_test(
         "tensor/*",
         "weight_managers/*",
         "runtime/*",
+        "tokenizers/*",
     ]) + select({
         "//platforms/device:cuda": glob([
             "device_managers/cuda/*",
@@ -32,6 +33,7 @@ cc_test(
         "//tiny_llm/graph:graph_optimizer",
         "//tiny_llm/runtime:greedy_memory_planer",
         "//tiny_llm/tensor",
+        "//tiny_llm/tokenizers/huggingface:tokenizers",
         "//tiny_llm/utils:runfile",
         "//tiny_llm/weight_managers/safetensors:weight_manager",
         "@googletest//:gtest",

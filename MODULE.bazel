@@ -42,5 +42,12 @@ crate.from_cargo(
     manifests = ["//tiny_llm/weight_managers/safetensors:Cargo.toml"],
 )
 use_repo(crate, "safetensors_deps")
+crate.from_cargo(
+    name = "tokenizers_deps",
+    cargo_lockfile = "//tiny_llm/tokenizers/huggingface:Cargo.lock",
+    lockfile = "//tiny_llm/tokenizers/huggingface:Cargo.Bazel.lock",
+    manifests = ["//tiny_llm/tokenizers/huggingface:Cargo.toml"],
+)
+use_repo(crate, "tokenizers_deps")
 
 bazel_dep(name = "google_benchmark", version = "1.9.5")
