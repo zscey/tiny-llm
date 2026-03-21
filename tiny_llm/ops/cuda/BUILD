@@ -77,10 +77,20 @@ cuda_library(
     ],
 )
 
+cuda_library(
+    name = "arithmetic",
+    srcs = ["arithmetic.cu"],
+    hdrs = ["arithmetic.hpp"],
+    deps = [
+        ":cuda_op_common",
+    ],
+)
+
 cc_library(
     name = "cuda_ops",
     visibility = ["//:__subpackages__"],
     deps = [
+        ":arithmetic",
         ":embedding",
         ":flash_attention",
         ":gemm",
