@@ -4,7 +4,7 @@
 
 namespace tiny_llm::cuda {
 /**
- * @brief RMSNorm.
+ * @brief RMSNorm, support inplace, which means `input == dst`.
  *
  * @param input [element_size, dim]
  * @param weight [dim]

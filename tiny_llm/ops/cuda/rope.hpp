@@ -16,7 +16,7 @@ void rope(float *cos_dst, float *sin_dst, uint32_t max_len, uint32_t dim,
           double base);
 
 /**
- * @brief
+ * @brief Inplace operation.
  *
  * @param cos [max_len, dim / 2]
  * @param sin [max_len, dim / 2]
