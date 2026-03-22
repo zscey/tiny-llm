@@ -164,7 +164,7 @@ TEST(CudaOps, GemmTL) {
     input = input.to(target_dev);
   }
 
-  Tensor weight({.type = DeviceType::kCpu}, DataType::kFloat32, {out_d, h * q});
+  Tensor weight({.type = DeviceType::kCpu}, DataType::kFloat32, {out_d, h * d});
   {
     auto *weight_ptr = weight.data<float>();
     for (size_t i = 0, i_end = static_cast<size_t>(out_d * h * d); i < i_end;
