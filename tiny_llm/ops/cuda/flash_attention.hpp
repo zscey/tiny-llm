@@ -11,7 +11,7 @@ enum class AttentionType : std::uint8_t {
 /**
  * @brief Flash attention.
  *
- * @param query [batch, q_length, q_head * dim]
+ * @param query [batch, q_head, q_length, dim]
  * @param key [batch, kv_head, kv_end, dim], use [batch, kv_head, :kv_length,
  * dim]
  * @param value [batch, kv_head, kv_end, dim], use [batch, kv_head, :kv_length,
