@@ -11,20 +11,20 @@ void bm_flash_attn_no_mask(benchmark::State &state) {
   int64_t kv_head = 4;
   uint32_t dim = 64;
   Tensor query({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-               {batch, state.range(0), q_head * dim}, true);
+               {batch, q_head, state.range(0), dim}, true);
   Tensor key({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-             {batch, state.range(0), kv_head * dim}, true);
+             {batch, kv_head, state.range(0), dim}, true);
   Tensor value({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-               {batch, state.range(0), kv_head * dim}, true);
+               {batch, kv_head, state.range(0), dim}, true);
   Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-             {batch, state.range(0), q_head * dim}, true);
+             {batch, q_head, state.range(0), dim}, true);
   ThreadCudaContexts::Synchronize();
 
   for (auto _ : state) {
     cuda::flash_attn(query.data<float>(), key.data<float>(),
                      value.data<float>(), dst.data<float>(), batch,
-                     state.range(0), state.range(0), dim, q_head, kv_head,
-                     cuda::AttentionType::kNoMask);
+                     state.range(0), state.range(0), state.range(0), dim,
+                     q_head, kv_head, cuda::AttentionType::kNoMask);
     ThreadCudaContexts::Synchronize();
   }
 }
@@ -35,20 +35,20 @@ void bm_flash_attn_causal_mask(benchmark::State &state) {
   int64_t kv_head = 4;
   uint32_t dim = 64;
   Tensor query({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-               {batch, state.range(0), q_head * dim}, true);
+               {batch, q_head, state.range(0), dim}, true);
   Tensor key({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-             {batch, state.range(0), kv_head * dim}, true);
+             {batch, kv_head, state.range(0), dim}, true);
   Tensor value({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-               {batch, state.range(0), kv_head * dim}, true);
+               {batch, kv_head, state.range(0), dim}, true);
   Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
-             {batch, state.range(0), q_head * dim}, true);
+             {batch, q_head, state.range(0), dim}, true);
   ThreadCudaContexts::Synchronize();
 
   for (auto _ : state) {
     cuda::flash_attn(query.data<float>(), key.data<float>(),
                      value.data<float>(), dst.data<float>(), batch,
-                     state.range(0), state.range(0), dim, q_head, kv_head,
-                     cuda::AttentionType::kCausalMask);
+                     state.range(0), state.range(0), state.range(0), dim,
+                     q_head, kv_head, cuda::AttentionType::kCausalMask);
     ThreadCudaContexts::Synchronize();
   }
 }

@@ -21,10 +21,10 @@ constexpr uint32_t kTileKV = kThreadIterPerKV * kWarpSize;
   ((((dim) + kWarpSize - 1) / kWarpSize * kWarpSize) + 1)
 
 __device__ auto get_shift(uint32_t batch_idx, uint32_t head_idx,
-                          uint32_t seq_idx, uint32_t seq_len, uint32_t head_num,
+                          uint32_t seq_idx, uint32_t head_num, uint32_t seq_len,
                           uint32_t dim) -> size_t {
-  return ((((static_cast<size_t>(batch_idx) * seq_len) + seq_idx) * head_num) +
-          head_idx) *
+  return ((((static_cast<size_t>(batch_idx) * head_num) + head_idx) * seq_len) +
+          seq_idx) *
          dim;
 }
 
@@ -120,10 +120,11 @@ __device__ auto set_global_m_l_o(const float *value, const float2 &local_m_l,
 }
 
 template <uint32_t OutPerThread, bool IsCausal>
-__global__ void
-flash_attn_kernel(const float *query, const float *key, const float *value,
-                  float *dst, uint32_t q_length, uint32_t kv_length,
-                  uint32_t dim, uint32_t q_head, uint32_t kv_head) {
+__global__ void flash_attn_kernel(const float *query, const float *key,
+                                  const float *value, float *dst,
+                                  uint32_t q_length, uint32_t kv_length,
+                                  uint32_t kv_end, uint32_t dim,
+                                  uint32_t q_head, uint32_t kv_head) {
   __shared__ typename ::cub::WarpReduce<float>::TempStorage
       temp_storage[kWarpNumPerBlock];
   float global_m[kWarpIterPerTileQ];
@@ -149,8 +150,8 @@ flash_attn_kernel(const float *query, const float *key, const float *value,
       value_buffer + (static_cast<size_t>(kTileKV) * padded_dim);
   auto q_row_num = ::min(kTileQ, q_length - (blockIdx.x * kTileQ));
   fetch_data(query + get_shift(blockIdx.z, blockIdx.y, blockIdx.x * kTileQ,
-                               q_length, q_head, dim),
-             query_buffer, q_row_num, dim, q_head * dim, padded_dim,
+                               q_head, q_length, dim),
+             query_buffer, q_row_num, dim, dim, padded_dim,
              ::rsqrtf(static_cast<float>(dim)));
 
   float local_s[kThreadIterPerKV];
@@ -158,11 +159,10 @@ flash_attn_kernel(const float *query, const float *key, const float *value,
                 kv_block_num = CalBlockNum(kv_length, kTileKV);
        kv_block_idx < kv_block_num; ++kv_block_idx) {
     auto kv_shift = get_shift(blockIdx.z, blockIdx.y / (q_head / kv_head),
-                              kv_block_idx * kTileKV, kv_length, kv_head, dim);
+                              kv_block_idx * kTileKV, kv_head, kv_end, dim);
     auto kv_row_num = ::min(kTileKV, kv_length - (kv_block_idx * kTileKV));
-    fetch_data(key + kv_shift, key_buffer, kv_row_num, dim, kv_head * dim,
-               padded_dim);
-    fetch_data(value + kv_shift, value_buffer, kv_row_num, dim, kv_head * dim,
+    fetch_data(key + kv_shift, key_buffer, kv_row_num, dim, dim, padded_dim);
+    fetch_data(value + kv_shift, value_buffer, kv_row_num, dim, dim,
                padded_dim);
     __syncthreads();
 
@@ -196,8 +196,8 @@ flash_attn_kernel(const float *query, const float *key, const float *value,
     auto cur_row_q = (blockIdx.x * kTileQ) + (warp_iter * kWarpNumPerBlock) +
                      (threadIdx.x / kWarpSize);
     if (cur_row_q < q_length) {
-      auto *dst_ptr = dst + get_shift(blockIdx.z, blockIdx.y, cur_row_q,
-                                      q_length, q_head, dim);
+      auto *dst_ptr = dst + get_shift(blockIdx.z, blockIdx.y, cur_row_q, q_head,
+                                      q_length, dim);
       for (uint32_t i = 0; i < OutPerThread; ++i) {
         auto cur_col = (i * kWarpSize) + (threadIdx.x % kWarpSize);
         if (cur_col < dim) {
@@ -219,15 +219,17 @@ flash_attn_kernel(const float *query, const float *key, const float *value,
   flash_attn_kernel<OutPerThread, IsCausal>                                    \
       <<<dim3{CalBlockNum(q_length, kTileQ), q_head, batch},                   \
          kThreadNumPerBlock, share_mem_size, context.stream>>>(                \
-          query, key, value, dst, q_length, kv_length, dim, q_head, kv_head);
+          query, key, value, dst, q_length, kv_length, kv_end, dim, q_head,    \
+          kv_head);
 
 void flash_attn(const float *query, const float *key, const float *value,
                 float *dst, uint32_t batch, uint32_t q_length,
-                uint32_t kv_length, uint32_t dim, uint32_t q_head,
-                uint32_t kv_head, AttentionType attn_type) {
+                uint32_t kv_length, uint32_t kv_end, uint32_t dim,
+                uint32_t q_head, uint32_t kv_head, AttentionType attn_type) {
   TINY_LLM_CHECK(batch > 0);
   TINY_LLM_CHECK(q_length > 0);
   TINY_LLM_CHECK(kv_length > 0);
+  TINY_LLM_CHECK(kv_end > 0);
   TINY_LLM_CHECK(dim > 0);
   TINY_LLM_CHECK(q_head > 0);
   TINY_LLM_CHECK(kv_head > 0);
