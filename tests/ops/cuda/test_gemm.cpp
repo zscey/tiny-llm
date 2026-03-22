@@ -29,11 +29,6 @@ TEST(CudaOps, GemmManual) {
     weight = weight.to(target_dev);
   }
 
-  Tensor dst_plain(target_dev, DataType::kFloat32, {m, n});
-  cuda::gemm_row_major_plain(input.data<float>(), weight.data<float>(), nullptr,
-                             dst_plain.data<float>(), m, d, n);
-  auto cpu_dst_plain = dst_plain.to({.type = DeviceType::kCpu});
-
   Tensor dst(target_dev, DataType::kFloat32, {m, n});
   cuda::gemm_row_major(input.data<float>(), weight.data<float>(), nullptr,
                        dst.data<float>(), m, d, n);
@@ -42,10 +37,8 @@ TEST(CudaOps, GemmManual) {
   std::vector<float> target_res{5.F, 14.F, 23.F, 32.F, 14.F, 50.F, 86.F, 122.F};
   ThreadCudaContexts::Synchronize();
 
-  const auto *dst_plain_ptr = cpu_dst_plain.data<float>();
   const auto *dst_ptr = cpu_dst.data<float>();
   for (size_t i = 0, i_end = static_cast<size_t>(m * n); i < i_end; ++i) {
-    EXPECT_FLOAT_EQ(dst_plain_ptr[i], target_res.at(i));
     EXPECT_FLOAT_EQ(dst_ptr[i], target_res.at(i));
   }
 }
@@ -74,11 +67,6 @@ TEST(CudaOps, Gemm) {
     weight = weight.to(target_dev);
   }
 
-  Tensor dst_plain(target_dev, DataType::kFloat32, {m, n});
-  cuda::gemm_row_major_plain(input.data<float>(), weight.data<float>(), nullptr,
-                             dst_plain.data<float>(), m, d, n);
-  auto cpu_dst_plain = dst_plain.to({.type = DeviceType::kCpu});
-
   Tensor dst(target_dev, DataType::kFloat32, {m, n});
   cuda::gemm_row_major(input.data<float>(), weight.data<float>(), nullptr,
                        dst.data<float>(), m, d, n);
@@ -88,13 +76,119 @@ TEST(CudaOps, Gemm) {
 
   SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
       "tiny_llm/tests/datas/gemm_m127d255n353.safetensors"));
-  const auto *dst_plain_ptr = cpu_dst_plain.data<float>();
   const auto *dst_ptr = cpu_dst.data<float>();
   const auto *target_ptr =
       reinterpret_cast<const float *>(wm.get_tensor("res").data);
   for (size_t i = 0, i_end = static_cast<size_t>(m * n); i < i_end; ++i) {
-    EXPECT_FLOAT_EQ(dst_plain_ptr[i], target_ptr[i]);
     EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]);
+  }
+}
+
+TEST(CudaOps, GemmLT) {
+  int64_t b = 2;
+  int64_t q = 61;
+  int64_t d = 255;
+  int64_t out_head = 4;
+  int64_t out_dim = 88;
+  int64_t q_start = 3;
+  int64_t q_end = q_start + q + 13;
+
+  Device target_dev = {.type = DeviceType::kCuda, .id = 0};
+
+  Tensor input({.type = DeviceType::kCpu}, DataType::kFloat32, {b, q, d});
+  {
+    auto *input_ptr = input.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(b * q * d); i < i_end; ++i) {
+      input_ptr[i] = static_cast<float>(i % 100);
+    }
+    input = input.to(target_dev);
+  }
+
+  Tensor weight({.type = DeviceType::kCpu}, DataType::kFloat32,
+                {out_head * out_dim, d});
+  {
+    auto *weight_ptr = weight.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(out_head * out_dim * d);
+         i < i_end; ++i) {
+      weight_ptr[i] = static_cast<float>(i % 100);
+    }
+    weight = weight.to(target_dev);
+  }
+
+  Tensor dst({.type = DeviceType::kCpu}, DataType::kFloat32,
+             {b, out_head, q_end, out_dim});
+  {
+    auto *dst_ptr = dst.data<float>();
+    for (size_t i = 0,
+                i_end = static_cast<size_t>(b * out_head * q_end * out_dim);
+         i < i_end; ++i) {
+      dst_ptr[i] = 1.F;
+    }
+    dst = dst.to(target_dev);
+  }
+  cuda::gemm_row_major_lt(input.data<float>(), weight.data<float>(), nullptr,
+                          dst.data<float>(), b, q, d, out_head, out_dim,
+                          q_start, q_end);
+  auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+  ThreadCudaContexts::Synchronize();
+
+  SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/gemm_b2q61d255oh4od88qs3qe77.safetensors"));
+  const auto *dst_ptr = cpu_dst.data<float>();
+  const auto *target_ptr =
+      reinterpret_cast<const float *>(wm.get_tensor("res").data);
+  for (size_t i = 0,
+              i_end = static_cast<size_t>(b * out_head * q_end * out_dim);
+       i < i_end; ++i) {
+    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]) << i;
+  }
+}
+
+TEST(CudaOps, GemmTL) {
+  int64_t b = 2;
+  int64_t h = 4;
+  int64_t q = 127;
+  int64_t d = 61;
+  int64_t out_d = 313;
+
+  Device target_dev = {.type = DeviceType::kCuda, .id = 0};
+
+  Tensor input({.type = DeviceType::kCpu}, DataType::kFloat32, {b, h, q, d});
+  {
+    auto *input_ptr = input.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(b * h * q * d); i < i_end;
+         ++i) {
+      input_ptr[i] = static_cast<float>(i % 100);
+    }
+    input = input.to(target_dev);
+  }
+
+  Tensor weight({.type = DeviceType::kCpu}, DataType::kFloat32, {out_d, h * d});
+  {
+    auto *weight_ptr = weight.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(out_d * h * d); i < i_end;
+         ++i) {
+      weight_ptr[i] = static_cast<float>(i % 100);
+    }
+    weight = weight.to(target_dev);
+  }
+
+  Tensor dst(target_dev, DataType::kFloat32, {b, q, out_d});
+  cuda::gemm_row_major_tl(input.data<float>(), weight.data<float>(), nullptr,
+                          dst.data<float>(), b, h, q, d, out_d);
+  auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+  ThreadCudaContexts::Synchronize();
+
+  SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/gemm_b2h4q127d61od313.safetensors"));
+  const auto *dst_ptr = cpu_dst.data<float>();
+  const auto *target_ptr =
+      reinterpret_cast<const float *>(wm.get_tensor("res").data);
+  for (size_t i = 0, i_end = static_cast<size_t>(b * q * out_d); i < i_end;
+       ++i) {
+    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]) << i;
   }
 }
 } // namespace tiny_llm
