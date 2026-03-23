@@ -3,7 +3,7 @@ package(default_visibility = ["//tests:__subpackages__"])
 filegroup(
     name = "datas",
     srcs = [
-        "apply_rope_s2_d96.safetensors",
+        "apply_rope_b3_h4_q2_d96_qs1qe5.safetensors",
         "attn_res_b2q107h4k123h2d61.safetensors",
         "bert_base_uncased_tokenizer.json",
         "causal_attn_res_b2l107q4k2d61.safetensors",
