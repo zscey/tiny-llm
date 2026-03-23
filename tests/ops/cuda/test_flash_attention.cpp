@@ -68,8 +68,8 @@ TEST(CudaOps, FlashAttnNoMask) {
     Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
                {batch, q_length, static_cast<int64_t>(q_head * dim)});
     cuda::flash_attn(query.data<float>(), key.data<float>(),
-                     value.data<float>(), dst.data<float>(), batch, q_length,
-                     kv_length, kv_length + kv_padding, dim, q_head, kv_head,
+                     value.data<float>(), dst.data<float>(), batch, q_head,
+                     kv_head, q_length, kv_length, dim, kv_length + kv_padding,
                      cuda::AttentionType::kNoMask);
     dst = dst.to({.type = DeviceType::kCpu, .id = 0});
     ThreadCudaContexts::Synchronize();
@@ -150,8 +150,8 @@ TEST(CudaOps, FlashAttnCausalMask) {
     Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
                {batch, q_length, static_cast<int64_t>(q_head * dim)});
     cuda::flash_attn(query.data<float>(), key.data<float>(),
-                     value.data<float>(), dst.data<float>(), batch, q_length,
-                     kv_length, kv_length + kv_padding, dim, q_head, kv_head,
+                     value.data<float>(), dst.data<float>(), batch, q_head,
+                     kv_head, q_length, kv_length, dim, kv_length + kv_padding,
                      cuda::AttentionType::kCausalMask);
     dst = dst.to({.type = DeviceType::kCpu, .id = 0});
     ThreadCudaContexts::Synchronize();

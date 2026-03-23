@@ -122,9 +122,9 @@ __device__ auto set_global_m_l_o(const float *value, const float2 &local_m_l,
 template <uint32_t OutPerThread, bool IsCausal>
 __global__ void flash_attn_kernel(const float *query, const float *key,
                                   const float *value, float *dst,
+                                  uint32_t q_head, uint32_t kv_head,
                                   uint32_t q_length, uint32_t kv_length,
-                                  uint32_t kv_end, uint32_t dim,
-                                  uint32_t q_head, uint32_t kv_head) {
+                                  uint32_t dim, uint32_t kv_end) {
   __shared__ typename ::cub::WarpReduce<float>::TempStorage
       temp_storage[kWarpNumPerBlock];
   float global_m[kWarpIterPerTileQ];
@@ -219,13 +219,13 @@ __global__ void flash_attn_kernel(const float *query, const float *key,
   flash_attn_kernel<OutPerThread, IsCausal>                                    \
       <<<dim3{CalBlockNum(q_length, kTileQ), q_head, batch},                   \
          kThreadNumPerBlock, share_mem_size, context.stream>>>(                \
-          query, key, value, dst, q_length, kv_length, kv_end, dim, q_head,    \
-          kv_head);
+          query, key, value, dst, q_head, kv_head, q_length, kv_length, dim,   \
+          kv_end);
 
 void flash_attn(const float *query, const float *key, const float *value,
-                float *dst, uint32_t batch, uint32_t q_length,
-                uint32_t kv_length, uint32_t kv_end, uint32_t dim,
-                uint32_t q_head, uint32_t kv_head, AttentionType attn_type) {
+                float *dst, uint32_t batch, uint32_t q_head, uint32_t kv_head,
+                uint32_t q_length, uint32_t kv_length, uint32_t dim,
+                uint32_t kv_end, AttentionType attn_type) {
   TINY_LLM_CHECK(batch > 0);
   TINY_LLM_CHECK(q_length > 0);
   TINY_LLM_CHECK(kv_length > 0);

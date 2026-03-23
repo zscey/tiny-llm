@@ -18,16 +18,16 @@ enum class AttentionType : std::uint8_t {
  * dim]
  * @param dst [batch, q_head, q_length, dim]
  * @param batch
- * @param q_length
- * @param kv_length
- * @param kv_end
- * @param dim
  * @param q_head
  * @param kv_head
+ * @param q_length
+ * @param kv_length
+ * @param dim
+ * @param kv_end
  * @param attn_type
  */
 void flash_attn(const float *query, const float *key, const float *value,
-                float *dst, uint32_t batch, uint32_t q_length,
-                uint32_t kv_length, uint32_t kv_end, uint32_t dim,
-                uint32_t q_head, uint32_t kv_head, AttentionType attn_type);
+                float *dst, uint32_t batch, uint32_t q_head, uint32_t kv_head,
+                uint32_t q_length, uint32_t kv_length, uint32_t dim,
+                uint32_t kv_end, AttentionType attn_type);
 } // namespace tiny_llm::cuda
