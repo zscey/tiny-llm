@@ -20,13 +20,15 @@ void rope(float *cos_dst, float *sin_dst, uint32_t max_len, uint32_t dim,
  *
  * @param cos [max_len, dim / 2]
  * @param sin [max_len, dim / 2]
- * @param position_ids [element_size]
- * @param dst [element_size, head_num * dim]
+ * @param position_ids [batch, seq_len]
+ * @param dst [batch, head_num, seq_end, dim], result write to [b, head_num,
+ * seq_start: seq_start + seq_len, dim]
  * @param element_size
  * @param head_num
  * @param dim
  */
 void apply_rope_inplace(const float *cos, const float *sin,
                         const uint32_t *position_ids, float *dst,
-                        size_t element_size, uint32_t head_num, uint32_t dim);
+                        uint32_t batch, uint32_t head_num, uint32_t seq_len,
+                        uint32_t dim, uint32_t seq_start, uint32_t seq_end);
 } // namespace tiny_llm::cuda

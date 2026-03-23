@@ -39,36 +39,60 @@ TEST(CudaOps, Rope) {
   }
 
   {
+    int64_t b = 3;
+    int64_t h = 4;
+    int64_t q = 2;
+    int64_t d = 96;
+    int64_t q_start = 1;
+    int64_t q_end = 5;
+
     SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
-        "tiny_llm/tests/datas/apply_rope_s2_d96.safetensors"));
+        "tiny_llm/tests/datas/apply_rope_b3_h4_q2_d96_qs1qe5.safetensors"));
 
     Tensor position_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
-                        {2});
+                        {b, q});
     auto *position_ids_ptr = position_ids.data<uint32_t>();
-    position_ids_ptr[0] = 0;
-    position_ids_ptr[1] = 1;
+    for (uint32_t i = 0; i < 6; ++i) {
+      position_ids_ptr[i] = i & 1U;
+    }
     position_ids = position_ids.to({.type = DeviceType::kCuda, .id = 0});
 
     Tensor dst({.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32,
-               {1, 2, 288});
+               {b, h, q_end, d});
     {
+      size_t i{};
       auto *dst_ptr = dst.data<float>();
-      for (size_t i = 0; i < 576; ++i) {
-        dst_ptr[i] = static_cast<float>(i);
+      for (size_t cur_b = 0; cur_b < b; ++cur_b) {
+        for (size_t cur_h = 0; cur_h < h; ++cur_h) {
+          auto *cur_ptr = dst_ptr + (((cur_b * h) + cur_h) * q_end * d);
+          auto *cur_ptr_end = cur_ptr + (q_start * d);
+          while (cur_ptr < cur_ptr_end) {
+            *cur_ptr++ = 1.F;
+          }
+          cur_ptr_end = cur_ptr + (q * d);
+          while (cur_ptr < cur_ptr_end) {
+            *cur_ptr++ = static_cast<float>(i % 100) / 100.F;
+            ++i;
+          }
+          cur_ptr_end = cur_ptr + ((q_end - q - q_start) * d);
+          while (cur_ptr < cur_ptr_end) {
+            *cur_ptr++ = 1.F;
+          }
+        }
       }
     }
     dst = dst.to({.type = DeviceType::kCuda, .id = 0});
 
     cuda::apply_rope_inplace(cos.data<float>(), sin.data<float>(),
                              position_ids.data<uint32_t>(), dst.data<float>(),
-                             2, 3, 96);
+                             b, h, q, d, q_start, q_end);
     dst = dst.to({.type = DeviceType::kCpu, .id = 0});
     ThreadCudaContexts::Synchronize();
 
     const auto *dst_ptr = dst.data<float>();
     const auto *target_ptr =
         reinterpret_cast<const float *>(wm.get_tensor("res").data);
-    for (size_t i = 0; i < 576; ++i) {
+    for (size_t i = 0, i_end = b * h * q_end * d; i < i_end; ++i) {
       EXPECT_TRUE(std::abs(dst_ptr[i] - target_ptr[i]) < 1e-4F);
     }
   }
