@@ -13,7 +13,9 @@
   }
 
 #define TINY_LLM_THROW_ERROR(exception_type, ...)                              \
-  throw exception_type(fmt::format(__VA_ARGS__))
+  auto err_msg = fmt::format(__VA_ARGS__);                                     \
+  spdlog::error("[{}: {}]: {}", __FILE__, __LINE__, err_msg);                  \
+  throw exception_type(err_msg);
 
 #define TINY_LLM_CUDA_CHECK(expr)                                              \
   if ((expr) != cudaSuccess) {                                                 \
