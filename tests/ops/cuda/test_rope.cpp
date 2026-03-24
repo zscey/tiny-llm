@@ -62,8 +62,8 @@ TEST(CudaOps, Rope) {
     {
       size_t i{};
       auto *dst_ptr = dst.data<float>();
-      for (size_t cur_b = 0; cur_b < b; ++cur_b) {
-        for (size_t cur_h = 0; cur_h < h; ++cur_h) {
+      for (int64_t cur_b = 0; cur_b < b; ++cur_b) {
+        for (int64_t cur_h = 0; cur_h < h; ++cur_h) {
           auto *cur_ptr = dst_ptr + (((cur_b * h) + cur_h) * q_end * d);
           auto *cur_ptr_end = cur_ptr + (q_start * d);
           while (cur_ptr < cur_ptr_end) {

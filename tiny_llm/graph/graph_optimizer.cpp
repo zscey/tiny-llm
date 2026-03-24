@@ -9,15 +9,6 @@
 
 namespace tiny_llm {
 namespace {
-[[maybe_unused]] auto encode(uint32_t id, bool is_node) -> uint32_t {
-  uint32_t flag = (static_cast<uint32_t>(is_node)) << 31U;
-  return flag | id;
-}
-
-[[maybe_unused]] auto decode(uint32_t code) -> std::pair<uint32_t, bool> {
-  return {(code << 1U) >> 1U, code >> 31U};
-}
-
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
   // Shrink g.nodes

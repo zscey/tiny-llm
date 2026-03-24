@@ -1,5 +1,4 @@
 #include "tiny_llm/runtime/greedy_memory_planer.hpp"
-#include "memory_planer.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include <stdexcept>
 
@@ -8,28 +7,12 @@ namespace {
 auto aligned_pos(size_t pos, size_t alignment) -> size_t {
   return (pos + alignment - 1) / alignment * alignment;
 }
-
-void merge(std::list<VirtualBlock> &v_blocks) {
-  auto iter = v_blocks.begin();
-  while (iter != v_blocks.end()) {
-    auto next_iter = std::next(iter);
-    if (next_iter == v_blocks.end()) {
-      break;
-    }
-
-    if (iter->offset + iter->size == next_iter->offset) {
-      iter->size += next_iter->size;
-      v_blocks.erase(next_iter);
-    } else {
-      iter = next_iter;
-    }
-  }
-}
 } // namespace
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto GreedyMemoryPlaner::allocate(size_t size, size_t alignment)
     -> VirtualBlock {
+  TINY_LLM_CHECK(size > 0);
   TINY_LLM_CHECK(alignment > 0);
 
   auto iter = v_blocks_.begin();
@@ -40,8 +23,9 @@ auto GreedyMemoryPlaner::allocate(size_t size, size_t alignment)
         v_blocks_.emplace(std::next(iter), offset + size,
                           iter->offset + iter->size - offset - size);
       }
-      if (iter->offset < offset) {
-        iter->size = offset - iter->offset;
+      iter->size = offset - iter->offset;
+      if (iter->size == 0) {
+        v_blocks_.erase(iter);
       }
       return {.offset = offset, .size = size};
     }
@@ -50,37 +34,61 @@ auto GreedyMemoryPlaner::allocate(size_t size, size_t alignment)
 
   auto offset = aligned_pos(total_size_, alignment);
   if (total_size_ < offset) {
-    v_blocks_.emplace_back(total_size_, offset - total_size_);
-    merge(v_blocks_);
+    if (!v_blocks_.empty() &&
+        v_blocks_.back().offset + v_blocks_.back().size == total_size_) {
+      v_blocks_.back().size += offset - total_size_;
+    } else {
+      v_blocks_.emplace_back(total_size_, offset - total_size_);
+    }
   }
   total_size_ = offset + size;
   return {.offset = offset, .size = size};
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void GreedyMemoryPlaner::deallocate(VirtualBlock v_block) {
   TINY_LLM_CHECK(v_block.offset + v_block.size <= total_size_);
 
   auto iter = v_blocks_.begin();
   while (iter != v_blocks_.end()) {
     if (v_block.offset + v_block.size <= iter->offset) {
-      iter = v_blocks_.insert(iter, v_block);
+      if (v_block.offset + v_block.size == iter->offset) {
+        iter->offset = v_block.offset;
+        iter->size += v_block.size;
+      } else {
+        iter = v_blocks_.emplace(iter, v_block);
+      }
+
+      if (iter != v_blocks_.begin()) {
+        auto prev_iter = std::prev(iter);
+        if (prev_iter->offset + prev_iter->size > iter->offset) {
+          TINY_LLM_THROW_ERROR(std::runtime_error, "Bad virtual block.");
+        }
+        if (prev_iter->offset + prev_iter->size == iter->offset) {
+          iter->offset = prev_iter->offset;
+          iter->size += prev_iter->size;
+          v_blocks_.erase(prev_iter);
+        }
+      }
+
       break;
     }
     std::advance(iter, 1);
   }
-  if (iter == v_blocks_.end()) {
-    v_blocks_.emplace_back(v_block);
-    iter = std::prev(v_blocks_.end());
-  }
 
-  if (iter != v_blocks_.begin()) {
-    auto prev_iter = std::prev(iter);
-    if (prev_iter->offset + prev_iter->size > v_block.offset) {
-      TINY_LLM_THROW_ERROR(std::runtime_error, "Bad virtual block.");
+  if (iter == v_blocks_.end()) {
+    if (!v_blocks_.empty() &&
+        v_blocks_.back().offset + v_blocks_.back().size == v_block.offset) {
+      v_blocks_.back().size += v_block.size;
+    } else {
+      if (!v_blocks_.empty()) {
+        if (v_blocks_.back().offset + v_blocks_.back().size > v_block.offset) {
+          TINY_LLM_THROW_ERROR(std::runtime_error, "Bad virtual block.");
+        }
+      }
+      v_blocks_.emplace_back(v_block);
     }
   }
-
-  merge(v_blocks_);
 }
 
 static_assert(MemoryPlanner<GreedyMemoryPlaner>);
