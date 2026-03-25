@@ -22,10 +22,13 @@ TEST(Runtime, CudaRuntime) {
                  SiLUParam{});
   graph.add_node("node3",
                  {.input_names = {"node2_out"}, .output_names = {"node3_out"}},
+                 SiLUParam{});
+  graph.add_node("node4",
+                 {.input_names = {"node3_out"}, .output_names = {"node4_out"}},
                  SiLUParam{.inplace = true});
 
   graph.set_input_names({"input1"});
-  graph.set_output_names({"node1_out", "node3_out"});
+  graph.set_output_names({"node1_out", "node4_out"});
   EXPECT_TRUE(is_valid(graph));
 
   auto cuda_plan = cuda::create_cuda_plan(
@@ -39,23 +42,23 @@ TEST(Runtime, CudaRuntime) {
     EXPECT_EQ(plan_input_0_task_infos.size(), 2);
     EXPECT_EQ(plan_input_0_task_infos.at(0).task_id, 0);
     EXPECT_EQ(plan_input_0_task_infos.at(0).io_id, 0);
-    EXPECT_EQ(plan_input_0_task_infos.at(1).task_id, 2);
+    EXPECT_EQ(plan_input_0_task_infos.at(1).task_id, 3);
     EXPECT_EQ(plan_input_0_task_infos.at(1).io_id, 0);
   }
 
   { // Check output infos
     EXPECT_EQ(cuda_plan.output_infos.size(), 2);
     EXPECT_EQ(std::get<0>(cuda_plan.output_infos.at("node1_out")), 1);
-    EXPECT_EQ(std::get<1>(cuda_plan.output_infos.at("node1_out")).task_id, 2);
+    EXPECT_EQ(std::get<1>(cuda_plan.output_infos.at("node1_out")).task_id, 3);
     EXPECT_EQ(std::get<1>(cuda_plan.output_infos.at("node1_out")).io_id, 0);
-    EXPECT_EQ(std::get<0>(cuda_plan.output_infos.at("node3_out")), 3);
-    EXPECT_EQ(std::get<1>(cuda_plan.output_infos.at("node3_out")).task_id, 1);
-    EXPECT_EQ(std::get<1>(cuda_plan.output_infos.at("node3_out")).io_id, 0);
+    EXPECT_EQ(std::get<0>(cuda_plan.output_infos.at("node4_out")), 4);
+    EXPECT_EQ(std::get<1>(cuda_plan.output_infos.at("node4_out")).task_id, 2);
+    EXPECT_EQ(std::get<1>(cuda_plan.output_infos.at("node4_out")).io_id, 0);
   }
 
   {
     // Check descs
-    EXPECT_EQ(cuda_plan.tensor_descs.size(), 4);
+    EXPECT_EQ(cuda_plan.tensor_descs.size(), 5);
     for (const auto &desc : cuda_plan.tensor_descs) {
       EXPECT_EQ(desc.dtype, DataType::kFloat32);
       EXPECT_EQ(desc.cur_shape, (std::vector<size_t>{2, 3, 4, 8}));
@@ -65,15 +68,16 @@ TEST(Runtime, CudaRuntime) {
 
   {
     // Check dependence
-    EXPECT_EQ(cuda_plan.tensor_dependence.size(), 4);
+    EXPECT_EQ(cuda_plan.tensor_dependence.size(), 5);
     EXPECT_EQ(cuda_plan.tensor_dependence.at(0), 2);
     EXPECT_EQ(cuda_plan.tensor_dependence.at(1), 0);
     EXPECT_EQ(cuda_plan.tensor_dependence.at(2), 1);
-    EXPECT_EQ(cuda_plan.tensor_dependence.at(3), 0);
+    EXPECT_EQ(cuda_plan.tensor_dependence.at(3), 1);
+    EXPECT_EQ(cuda_plan.tensor_dependence.at(4), 0);
   }
 
   { // Check tasks
-    EXPECT_EQ(cuda_plan.tasks.size(), 3);
+    EXPECT_EQ(cuda_plan.tasks.size(), 4);
     const auto &task0 = cuda_plan.tasks[0];
     EXPECT_EQ(task0.name, "node2");
     EXPECT_TRUE(std::holds_alternative<cuda::SiLUKernel>(task0.kernel));
@@ -87,19 +91,28 @@ TEST(Runtime, CudaRuntime) {
     EXPECT_EQ(task1.name, "node3");
     EXPECT_TRUE(std::holds_alternative<cuda::SiLUKernel>(task1.kernel));
     EXPECT_EQ(task1.predecessors, std::vector<uint32_t>{0});
-    EXPECT_TRUE(task1.successors.empty());
+    EXPECT_EQ(task1.successors, std::vector<uint32_t>{2});
     EXPECT_EQ(task1.input_descs,
               (std::vector<const TensorDesc *>{&cuda_plan.tensor_descs.at(2)}));
     EXPECT_EQ(task1.output_descs,
               (std::vector<TensorDesc *>{&cuda_plan.tensor_descs.at(3)}));
     const auto &task2 = cuda_plan.tasks[2];
-    EXPECT_EQ(task2.name, "node1");
+    EXPECT_EQ(task2.name, "node4");
     EXPECT_TRUE(std::holds_alternative<cuda::SiLUKernel>(task2.kernel));
-    EXPECT_TRUE(task2.predecessors.empty());
+    EXPECT_EQ(task2.predecessors, std::vector<uint32_t>{1});
     EXPECT_TRUE(task2.successors.empty());
     EXPECT_EQ(task2.input_descs,
-              (std::vector<const TensorDesc *>{&cuda_plan.tensor_descs.at(0)}));
+              (std::vector<const TensorDesc *>{&cuda_plan.tensor_descs.at(3)}));
     EXPECT_EQ(task2.output_descs,
+              (std::vector<TensorDesc *>{&cuda_plan.tensor_descs.at(4)}));
+    const auto &task3 = cuda_plan.tasks[3];
+    EXPECT_EQ(task3.name, "node1");
+    EXPECT_TRUE(std::holds_alternative<cuda::SiLUKernel>(task3.kernel));
+    EXPECT_TRUE(task3.predecessors.empty());
+    EXPECT_TRUE(task3.successors.empty());
+    EXPECT_EQ(task3.input_descs,
+              (std::vector<const TensorDesc *>{&cuda_plan.tensor_descs.at(0)}));
+    EXPECT_EQ(task3.output_descs,
               (std::vector<TensorDesc *>{&cuda_plan.tensor_descs.at(1)}));
   }
 
@@ -114,26 +127,43 @@ TEST(Runtime, CudaRuntime) {
     auto output_names = cuda_runtime.output_names();
     std::ranges::sort(output_names);
     EXPECT_TRUE(
-        (output_names == std::vector<std::string>{"node1_out", "node3_out"}));
+        (output_names == std::vector<std::string>{"node1_out", "node4_out"}));
 
     Tensor input1({.type = DeviceType::kCpu}, DataType::kFloat32, {2, 3, 4, 10},
                   true);
     EXPECT_ANY_THROW(cuda_runtime.bind_input("input1", input1));
     EXPECT_ANY_THROW(cuda_runtime.cpu_tensor_copy_to_input("input1", input1));
     input1.reallocate({2, 3, 4, 1});
-    *input1.data<float>() = 1.F;
+    {
+      auto *input1_ptr = input1.data<float>();
+      for (size_t i = 0; i < 24; ++i) {
+        input1_ptr[i] = 1.F;
+      }
+    }
     cuda_runtime.cpu_tensor_copy_to_input("input1", input1);
     cuda_runtime.execute();
 
     Tensor node1_out({.type = DeviceType::kCpu}, DataType::kFloat32, {2}, true);
     cuda_runtime.output_copy_to_cpu_tensor("node1_out", node1_out);
-    EXPECT_FLOAT_EQ(*node1_out.data<float>(), silu(1.F));
     EXPECT_EQ(node1_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
-    Tensor node3_out({.type = DeviceType::kCudaHost}, DataType::kFloat32,
+    {
+      const auto *node1_out_ptr = node1_out.data<float>();
+      float target = silu(1.F);
+      for (size_t i = 0; i < 24; ++i) {
+        EXPECT_FLOAT_EQ(node1_out_ptr[i], target) << i;
+      }
+    }
+    Tensor node4_out({.type = DeviceType::kCudaHost}, DataType::kFloat32,
                      {2, 3, 4, 12}, true);
-    cuda_runtime.output_copy_to_cpu_tensor("node3_out", node3_out);
-    EXPECT_FLOAT_EQ(*node3_out.data<float>(), silu(silu(1.F)));
-    EXPECT_EQ(node3_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
+    cuda_runtime.output_copy_to_cpu_tensor("node4_out", node4_out);
+    EXPECT_EQ(node4_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
+    {
+      const auto *node4_out_ptr = node4_out.data<float>();
+      float target = silu(silu(silu(1.F)));
+      for (size_t i = 0; i < 24; ++i) {
+        EXPECT_FLOAT_EQ(node4_out_ptr[i], target) << i;
+      }
+    }
   }
 }
 
