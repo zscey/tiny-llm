@@ -6,18 +6,22 @@
 #include <variant>
 
 namespace tiny_llm::cuda {
-struct ExecuteContext {
-  cudaStream_t stream;
-};
+/**
+ * 1. dtype_shape_infer(...): sets the `dtype` and `cur_shape` for each output
+ * desc.
+ * 2. execute(...): runs the corresponding kernel in the current thread context.
+ */
 
-/// @brief {a, b} -> {c}
 class SiLUKernel {
 public:
+  bool inplace{};
+
   size_t element_size{};
 
+  /// @brief {input} -> {output}
   void dtype_shape_infer(const TensorDesc *const *input_descs,
                          TensorDesc *const *output_descs);
-  void execute(const void *const *inputs, void *const *outputs);
+  void execute(const void *const *inputs, void *const *outputs) const;
 };
 
 using CudaKernel = std::variant<SiLUKernel>;

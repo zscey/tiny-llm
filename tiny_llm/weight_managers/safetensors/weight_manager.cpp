@@ -29,6 +29,15 @@ auto to_slice_view(const SliceViewRaw &raw) -> SliceView {
   std::memcpy(res.shape.data(), &raw.shape, raw.shape_dim * sizeof(size_t));
   return res;
 }
+
+auto get_element_size(const std::vector<int64_t> &shape) -> int64_t {
+  return shape.empty()
+             ? 0
+             : std::accumulate(shape.begin(), shape.end(), 1,
+                               [](int64_t left, int64_t right) -> int64_t {
+                                 return left * right;
+                               });
+}
 } // namespace
 } // namespace tiny_llm
 
@@ -70,10 +79,7 @@ auto SafeTensorWeightManager::get_tensor(const std::string &name) -> SliceView {
             .shape = tensor.shape(),
             .data = tensor.data(),
             .data_len =
-                std::accumulate(
-                    tensor.shape().begin(), tensor.shape().end(), 1,
-                    [](int64_t a, int64_t b) -> int64_t { return a * b; }) *
-                type_size(tensor.dtype())};
+                get_element_size(tensor.shape()) * type_size(tensor.dtype())};
   }
 
   auto raw = safetensor_get_tensor(ctx_, name.c_str());
@@ -86,11 +92,9 @@ void SafeTensorWeightManager::set_tensor(std::string name,
                                          SliceView slice_view) {
   TINY_LLM_CHECK(slice_view.data != nullptr);
   TINY_LLM_CHECK(slice_view.data_len > 0);
-  TINY_LLM_CHECK(
-      std::accumulate(slice_view.shape.begin(), slice_view.shape.end(), 1,
-                      [](int64_t a, int64_t b) -> int64_t { return a * b; }) *
-          type_size(slice_view.dtype) ==
-      slice_view.data_len);
+  TINY_LLM_CHECK(get_element_size(slice_view.shape) *
+                     type_size(slice_view.dtype) ==
+                 slice_view.data_len);
 
   auto &tensor =
       user_defined_weights_

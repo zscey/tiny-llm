@@ -93,6 +93,58 @@ auto is_valid_map(const std::unordered_map<std::string, uint32_t> &map)
                          [](auto a, auto b) -> auto { return a + b; }) ==
          static_cast<int32_t>(map_size);
 }
+
+auto is_valid_tensor_infos(const Graph &g) -> bool {
+  return std::ranges::all_of(
+      g.tensor_infos, [&g](const auto &named_tensor_info) -> auto {
+        if (!named_tensor_info) {
+          return false;
+        }
+        auto size = g.nodes.size();
+        const auto &tensor_info = named_tensor_info->second;
+        const auto &producer_node = tensor_info.producer_node;
+        return g.tensor_name_to_idx.contains(named_tensor_info->first) &&
+               std::ranges::all_of(
+                   tensor_info.consumer_nodes,
+                   [size](auto id) -> auto { return id < size; }) &&
+               ((producer_node && *producer_node < size) ||
+                (!producer_node && tensor_info.has_explicit_added));
+      });
+}
+
+auto is_valid_nodes(const Graph &g) -> bool {
+  return std::ranges::all_of(g.nodes, [&g](const auto &named_node) -> auto {
+    if (!named_node) {
+      return false;
+    }
+    auto size = g.tensor_infos.size();
+    auto pred = [size](auto id) -> auto { return id >= size; };
+    if (!g.node_name_to_idx.contains(named_node->first) ||
+        std::ranges::any_of(named_node->second.input_tensors, pred) ||
+        std::ranges::any_of(named_node->second.output_tensors, pred)) {
+      return false;
+    };
+
+    auto inner_inplace_ids = get_inplace_input_ids(named_node->second.param);
+    for (auto inner_id : inner_inplace_ids) {
+      const auto &consumer_nodes =
+          g.tensor_infos.at(named_node->second.input_tensors.at(inner_id))
+              ->second.consumer_nodes;
+      std::unordered_set<uint32_t> unique_consumer{consumer_nodes.begin(),
+                                                   consumer_nodes.end()};
+      if (unique_consumer.size() != 1) {
+        TINY_LLM_THROW_ERROR(
+            std::runtime_error,
+            "Tensor [{}] is the input for inplace operation, but it has {} "
+            "consumers.",
+            g.tensor_infos.at(named_node->second.input_tensors.at(inner_id))
+                ->first,
+            unique_consumer.size());
+      }
+    }
+    return true;
+  });
+}
 } // namespace
 
 auto is_valid(const Graph &g) -> bool {
@@ -101,35 +153,7 @@ auto is_valid(const Graph &g) -> bool {
       !is_valid_map(g.node_name_to_idx) ||
       g.tensor_name_to_idx.size() != g.tensor_infos.size() ||
       g.node_name_to_idx.size() != g.nodes.size() ||
-      std::ranges::any_of(
-          g.tensor_infos,
-          [&g](const auto &named_tensor_info) -> auto {
-            if (!named_tensor_info) {
-              return true;
-            }
-            auto size = g.nodes.size();
-            const auto &tensor_info = named_tensor_info->second;
-            const auto &producer_node = tensor_info.producer_node;
-            return !g.tensor_name_to_idx.contains(named_tensor_info->first) ||
-                   std::ranges::any_of(
-                       tensor_info.consumer_nodes,
-                       [size](auto id) -> auto { return id >= size; }) ||
-                   (producer_node && *producer_node >= size) ||
-                   (!producer_node && !tensor_info.has_explicit_added);
-          }) ||
-      std::ranges::any_of(
-          g.nodes,
-          [&g](const auto &named_node) -> auto {
-            if (!named_node) {
-              return true;
-            }
-            auto size = g.tensor_infos.size();
-            auto pred = [size](auto id) -> auto { return id >= size; };
-            return !g.node_name_to_idx.contains(named_node->first) ||
-                   std::ranges::any_of(named_node->second.input_tensors,
-                                       pred) ||
-                   std::ranges::any_of(named_node->second.output_tensors, pred);
-          }) ||
+      !is_valid_tensor_infos(g) || !is_valid_nodes(g) ||
       std::ranges::any_of(g.input_names,
                           [&g](const auto &name) -> auto {
                             const auto idx_iter =

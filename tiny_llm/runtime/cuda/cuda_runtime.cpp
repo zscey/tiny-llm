@@ -1,7 +1,6 @@
 #include "tiny_llm/runtime/cuda/cuda_runtime.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
-#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include "tiny_llm/runtime/greedy_memory_planer.hpp"
 #include <algorithm>
 #include <cstddef>
@@ -14,29 +13,23 @@ namespace {
 constexpr size_t kAlign = 256;
 
 auto element_num(const std::vector<size_t> &shape) -> size_t {
-  return std::accumulate(
-      shape.begin(), shape.end(), 1,
-      [](const auto &left, const auto &right) -> auto { return left * right; });
+  return shape.empty()
+             ? 0
+             : std::accumulate(shape.begin(), shape.end(), 1,
+                               [](const auto &left, const auto &right) -> auto {
+                                 return left * right;
+                               });
 }
 
 struct Relation {
-  uint32_t dependency{};
-  std::vector<VirtualBlock> v_blocks;
+  uint32_t dependence{};
+  VirtualBlock v_block;
 };
-
-auto is_output(const CudaPlan &cuda_plan, const CudaPlan::TaskIO &task_io)
-    -> bool {
-  return std::ranges::any_of(
-      cuda_plan.output_infos, [&task_io](const auto &named_info) -> auto {
-        return named_info.second.second.task_id == task_io.task_id &&
-               named_info.second.second.io_id == task_io.io_id;
-      });
-}
 
 struct SizeCalculator {
   GreedyMemoryPlaner gmp;
-  std::vector<Relation> relations;
   const CudaPlan *cur_plan{};
+  std::vector<Relation> relations;
   std::vector<size_t> offsets;
   std::unordered_map<const void *, uint32_t> desc_ptr_to_id;
 
@@ -45,8 +38,8 @@ struct SizeCalculator {
   void apply(const CudaPlan &plan) {
     // init
     gmp = GreedyMemoryPlaner{};
-    relations.assign(plan.tasks.size(), {});
     cur_plan = &plan;
+    relations.assign(plan.tensor_descs.size(), {});
     offsets.assign(plan.tensor_descs.size(), 0);
     desc_ptr_to_id.clear();
     for (uint32_t i = 0, i_end = plan.tensor_descs.size(); i < i_end; ++i) {
@@ -58,6 +51,9 @@ struct SizeCalculator {
       const auto &desc = plan.tensor_descs.at(info.first);
       auto v_block = gmp.allocate(
           element_num(desc.max_shape) * type_size(desc.dtype), kAlign);
+      relations.at(info.first) =
+          Relation{.dependence = static_cast<uint32_t>(info.second.size()),
+                   .v_block = v_block};
       offsets.at(info.first) = v_block.offset;
     }
 
@@ -66,37 +62,36 @@ struct SizeCalculator {
       cur_task_id = i;
       const auto &cur_task = plan.tasks.at(cur_task_id);
       std::visit(*this, cur_task.kernel);
-      for (auto id : cur_task.predecessors) {
-        auto &cur_relation = relations.at(id);
-        if (cur_relation.dependency > 0) {
-          --cur_relation.dependency;
-          if (cur_relation.dependency == 0) {
-            for (const auto &v_block : cur_relation.v_blocks) {
-              gmp.deallocate(v_block);
-            }
-            cur_relation.v_blocks.clear();
+      for (const auto *desc_ptr : cur_task.input_descs) {
+        auto &cur_relation = relations.at(desc_ptr_to_id.at(desc_ptr));
+        if (cur_relation.dependence > 0) {
+          --cur_relation.dependence;
+          if (cur_relation.dependence == 0) {
+            gmp.deallocate(cur_relation.v_block);
           }
         }
       }
     }
   }
 
-  void operator()(const SiLUKernel & /* unused*/) {
+  void operator()(const SiLUKernel &kernel) {
     const auto &cur_task = cur_plan->tasks.at(cur_task_id);
-    auto &cur_relation = relations.at(cur_task_id);
-    cur_relation.dependency = cur_task.successors.size();
-    cur_relation.v_blocks.reserve(cur_task.output_descs.size());
+    auto &input_relation =
+        relations.at(desc_ptr_to_id.at(cur_task.input_descs.at(0)));
 
-    for (uint32_t i = 0, i_end = cur_task.output_descs.size(); i < i_end; ++i) {
-      const auto *cur_desc = cur_task.output_descs.at(i);
-      auto v_block = gmp.allocate(element_num(cur_desc->max_shape) *
-                                      type_size(cur_desc->dtype),
-                                  kAlign);
-      offsets.at(desc_ptr_to_id.at(cur_desc)) = v_block.offset;
-      if (!is_output(*cur_plan, {.task_id = cur_task_id, .io_id = i})) {
-        cur_relation.v_blocks.emplace_back(v_block);
-      }
+    auto output_desc_id = desc_ptr_to_id.at(cur_task.output_descs.at(0));
+    auto &output_relation = relations.at(output_desc_id);
+    output_relation.dependence = cur_plan->tensor_dependence.at(output_desc_id);
+    if (kernel.inplace) {
+      input_relation.dependence = 0;
+      output_relation.v_block = input_relation.v_block;
+    } else {
+      const auto &output_desc = cur_task.output_descs.at(0);
+      output_relation.v_block = gmp.allocate(
+          element_num(output_desc->max_shape) * type_size(output_desc->dtype),
+          kAlign);
     }
+    offsets.at(output_desc_id) = output_relation.v_block.offset;
   }
 };
 
