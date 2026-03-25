@@ -150,7 +150,7 @@ TEST(Runtime, CudaRuntime) {
       const auto *node1_out_ptr = node1_out.data<float>();
       float target = silu(1.F);
       for (size_t i = 0; i < 24; ++i) {
-        EXPECT_FLOAT_EQ(node1_out_ptr[i], target) << i;
+        EXPECT_FLOAT_EQ(node1_out_ptr[i], target);
       }
     }
     Tensor node4_out({.type = DeviceType::kCudaHost}, DataType::kFloat32,
@@ -161,7 +161,7 @@ TEST(Runtime, CudaRuntime) {
       const auto *node4_out_ptr = node4_out.data<float>();
       float target = silu(silu(silu(1.F)));
       for (size_t i = 0; i < 24; ++i) {
-        EXPECT_FLOAT_EQ(node4_out_ptr[i], target) << i;
+        EXPECT_FLOAT_EQ(node4_out_ptr[i], target);
       }
     }
   }
