@@ -2,13 +2,16 @@
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/utils/visitor.hpp"
 #include <algorithm>
+#include <iterator>
 #include <stack>
 #include <unordered_set>
 
 namespace tiny_llm::cuda {
 namespace {
 const auto kKernelGenerator = Visitor{
-    [](const SiLUParam &) -> SiLUKernel { return SiLUKernel{}; },
+    [](const SiLUParam &param) -> SiLUKernel {
+      return SiLUKernel{.inplace = param.inplace};
+    },
 };
 
 enum class Status : std::uint8_t {
@@ -74,6 +77,20 @@ auto create_task(CudaPlan &plan, std::unordered_set<uint32_t> &cache,
                  const Graph &graph, uint32_t node_id,
                  const std::vector<uint32_t> &nodes_mapping) -> void {
   const auto &[node_name, graph_node] = graph.nodes.at(node_id).value();
+  if (graph_node.input_tensors.size() != input_num(graph_node.param)) {
+    TINY_LLM_THROW_ERROR(std::runtime_error,
+                         "The number of inputs for node [{}] is incorrect; it "
+                         "should be {}, but is currently {}.",
+                         node_name, input_num(graph_node.param),
+                         graph_node.input_tensors.size());
+  }
+  if (graph_node.output_tensors.size() != output_num(graph_node.param)) {
+    TINY_LLM_THROW_ERROR(std::runtime_error,
+                         "The number of outputs for node [{}] is incorrect; it "
+                         "should be {}, but is currently {}.",
+                         node_name, output_num(graph_node.param),
+                         graph_node.output_tensors.size());
+  }
   auto &task = plan.tasks.emplace_back(
       CudaPlan::Task{.name = node_name,
                      .kernel = std::visit(kKernelGenerator, graph_node.param)});
@@ -180,6 +197,13 @@ auto create_cuda_plan(const Graph &graph, const PlanConfig &plan_config)
   CudaPlan plan;
   // preserve tensor order, change graph node order to topological order
   plan.tensor_descs.resize(graph.tensor_infos.size());
+  plan.tensor_dependence.reserve(graph.tensor_infos.size());
+  std::ranges::transform(graph.tensor_infos,
+                         std::back_inserter(plan.tensor_dependence),
+                         [](const auto &named_tensor_info) -> auto {
+                           return static_cast<uint32_t>(
+                               named_tensor_info->second.consumer_nodes.size());
+                         });
   plan.tasks.reserve(graph.nodes.size());
 
   std::unordered_set<uint32_t> cache;

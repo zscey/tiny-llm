@@ -31,6 +31,7 @@ struct CudaPlan {
   };
 
   std::vector<TensorDesc> tensor_descs;
+  std::vector<uint32_t> tensor_dependence;
   std::vector<Task> tasks;
 
   // name -> {desc_id, task_inputs}

@@ -3,6 +3,7 @@
 #include "tiny_llm/utils/runfile.hpp"
 #include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
+#include <variant>
 
 namespace tiny_llm {
 TEST(Graph, GraphBaseApi) {
@@ -58,22 +59,22 @@ TEST(Graph, GraphBaseApi) {
     EXPECT_EQ(node0.first, "node1");
     EXPECT_EQ(node0.second.input_tensors, (std::vector<uint32_t>{0}));
     EXPECT_EQ(node0.second.output_tensors, (std::vector<uint32_t>{1}));
-    EXPECT_EQ(node0.second.param.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<SiLUParam>(node0.second.param));
     const auto &node1 = graph.nodes.at(1).value();
     EXPECT_EQ(node1.first, "node2");
     EXPECT_EQ(node1.second.input_tensors, (std::vector<uint32_t>{0}));
     EXPECT_EQ(node1.second.output_tensors, (std::vector<uint32_t>{2}));
-    EXPECT_EQ(node1.second.param.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<SiLUParam>(node1.second.param));
     const auto &node2 = graph.nodes.at(2).value();
     EXPECT_EQ(node2.first, "node3");
     EXPECT_EQ(node2.second.input_tensors, (std::vector<uint32_t>{2}));
     EXPECT_EQ(node2.second.output_tensors, (std::vector<uint32_t>{3}));
-    EXPECT_EQ(node2.second.param.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<SiLUParam>(node2.second.param));
     const auto &node3 = graph.nodes.at(3).value();
     EXPECT_EQ(node3.first, "node4");
     EXPECT_EQ(node3.second.input_tensors, (std::vector<uint32_t>{4}));
     EXPECT_EQ(node3.second.output_tensors, (std::vector<uint32_t>{5}));
-    EXPECT_EQ(node3.second.param.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<SiLUParam>(node3.second.param));
 
     EXPECT_EQ(graph.tensor_infos.size(), 6);
     const auto &tensor_info0 = graph.tensor_infos.at(0).value();
@@ -134,7 +135,7 @@ TEST(Graph, GraphBaseApi) {
     EXPECT_EQ(node0.first, "node2");
     EXPECT_EQ(node0.second.input_tensors, (std::vector<uint32_t>{0}));
     EXPECT_EQ(node0.second.output_tensors, (std::vector<uint32_t>{1}));
-    EXPECT_EQ(node0.second.param.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<SiLUParam>(node0.second.param));
 
     EXPECT_EQ(graph.tensor_infos.size(), 2);
     const auto &tensor_info0 = graph.tensor_infos.at(0).value();

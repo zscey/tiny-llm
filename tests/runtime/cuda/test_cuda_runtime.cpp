@@ -22,7 +22,7 @@ TEST(Runtime, CudaRuntime) {
                  SiLUParam{});
   graph.add_node("node3",
                  {.input_names = {"node2_out"}, .output_names = {"node3_out"}},
-                 SiLUParam{});
+                 SiLUParam{.inplace = true});
 
   graph.set_input_names({"input1"});
   graph.set_output_names({"node1_out", "node3_out"});
@@ -63,11 +63,20 @@ TEST(Runtime, CudaRuntime) {
     }
   }
 
+  {
+    // Check dependence
+    EXPECT_EQ(cuda_plan.tensor_dependence.size(), 4);
+    EXPECT_EQ(cuda_plan.tensor_dependence.at(0), 2);
+    EXPECT_EQ(cuda_plan.tensor_dependence.at(1), 0);
+    EXPECT_EQ(cuda_plan.tensor_dependence.at(2), 1);
+    EXPECT_EQ(cuda_plan.tensor_dependence.at(3), 0);
+  }
+
   { // Check tasks
     EXPECT_EQ(cuda_plan.tasks.size(), 3);
     const auto &task0 = cuda_plan.tasks[0];
     EXPECT_EQ(task0.name, "node2");
-    EXPECT_EQ(task0.kernel.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<cuda::SiLUKernel>(task0.kernel));
     EXPECT_TRUE(task0.predecessors.empty());
     EXPECT_EQ(task0.successors, std::vector<uint32_t>{1});
     EXPECT_EQ(task0.input_descs,
@@ -76,7 +85,7 @@ TEST(Runtime, CudaRuntime) {
               (std::vector<TensorDesc *>{&cuda_plan.tensor_descs.at(2)}));
     const auto &task1 = cuda_plan.tasks[1];
     EXPECT_EQ(task1.name, "node3");
-    EXPECT_EQ(task1.kernel.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<cuda::SiLUKernel>(task1.kernel));
     EXPECT_EQ(task1.predecessors, std::vector<uint32_t>{0});
     EXPECT_TRUE(task1.successors.empty());
     EXPECT_EQ(task1.input_descs,
@@ -85,7 +94,7 @@ TEST(Runtime, CudaRuntime) {
               (std::vector<TensorDesc *>{&cuda_plan.tensor_descs.at(3)}));
     const auto &task2 = cuda_plan.tasks[2];
     EXPECT_EQ(task2.name, "node1");
-    EXPECT_EQ(task2.kernel.index(), 0);
+    EXPECT_TRUE(std::holds_alternative<cuda::SiLUKernel>(task2.kernel));
     EXPECT_TRUE(task2.predecessors.empty());
     EXPECT_TRUE(task2.successors.empty());
     EXPECT_EQ(task2.input_descs,
