@@ -105,6 +105,7 @@ TEST(Runtime, Embedding) {
         ids_ptr[0] = 3;
         ids_ptr[1] = 1;
         ids = ids.to({.type = DeviceType::kCuda, .id = 0});
+        ThreadCudaContexts::Synchronize();
       }
       cuda_runtime.bind_input("ids", ids);
       cuda_runtime.execute();
