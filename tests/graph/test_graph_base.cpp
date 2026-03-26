@@ -1,7 +1,6 @@
+#include "tests/utils/weight_manager.hpp"
 #include "tiny_llm/graph/graph.hpp"
 #include "tiny_llm/graph/graph_optimizer.hpp"
-#include "tiny_llm/utils/runfile.hpp"
-#include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
 #include <variant>
 
@@ -116,9 +115,7 @@ TEST(Graph, GraphBaseApi) {
 
   PassManager pass_manager;
   pass_manager.add_pass(PruningPass{});
-  WeightManagerWrapper weight_manager(
-      (SafeTensorWeightManager(utils::BazelRunfile::RLocation(
-          "tiny_llm/tests/datas/test.safetensors"))));
+  WeightManagerWrapper weight_manager(TestWeightManager{});
   pass_manager.run(graph, weight_manager);
   EXPECT_TRUE(is_valid(graph));
   {

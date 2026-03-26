@@ -64,8 +64,8 @@ public:
 private:
   Device device_{};
   DataType dtype_{};
-  std::vector<int64_t> shape_;
-  std::vector<int64_t> stride_;
+  std::vector<int64_t> shape_;  // element shape
+  std::vector<int64_t> stride_; // byte stride
   size_t offset_{};
   std::shared_ptr<Buffer> buffer_;
 };

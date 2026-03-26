@@ -12,6 +12,16 @@ namespace tiny_llm::cuda {
 namespace {
 constexpr size_t kAlign = 256;
 
+template <typename From, typename To>
+auto vector_convert(const std::vector<From> &from) -> std::vector<To> {
+  std::vector<To> to;
+  to.reserve(from.size());
+  std::ranges::transform(
+      from, std::back_inserter(to),
+      [](const auto &elem) -> auto { return static_cast<To>(elem); });
+  return to;
+}
+
 auto element_num(const std::vector<size_t> &shape) -> size_t {
   return shape.empty()
              ? 0
@@ -19,6 +29,31 @@ auto element_num(const std::vector<size_t> &shape) -> size_t {
                                [](const auto &left, const auto &right) -> auto {
                                  return left * right;
                                });
+}
+
+auto desc_to_tensor(Device device, const TensorDesc &desc, const void *data_ptr)
+    -> Tensor {
+  return {device,
+          desc.dtype,
+          vector_convert<size_t, int64_t>(desc.cur_shape),
+          {},
+          0,
+          std::make_shared<Buffer>(
+              // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+              const_cast<void *>(data_ptr),
+              element_num(desc.max_shape) * type_size(desc.dtype), device)};
+}
+
+auto slice_view_to_tensor(const SliceView &slice_view) -> Tensor {
+  Device device{.type = DeviceType::kCpu, .id = 0};
+  return {device,
+          slice_view.dtype,
+          slice_view.shape,
+          {},
+          0,
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+          std::make_shared<Buffer>(const_cast<void *>(slice_view.data),
+                                   slice_view.data_len, device)};
 }
 
 struct Relation {
@@ -71,27 +106,47 @@ struct SizeCalculator {
           }
         }
       }
+      for (const auto *desc_ptr : cur_task.output_descs) {
+        auto desc_id = desc_ptr_to_id.at(desc_ptr);
+        auto &cur_relation = relations.at(desc_id);
+        cur_relation.dependence = cur_plan->tensor_dependence.at(desc_id);
+        offsets.at(desc_id) = cur_relation.v_block.offset;
+      }
     }
   }
 
   void operator()(const SiLUKernel &kernel) {
     const auto &cur_task = cur_plan->tasks.at(cur_task_id);
-    auto &input_relation =
-        relations.at(desc_ptr_to_id.at(cur_task.input_descs.at(0)));
 
-    auto output_desc_id = desc_ptr_to_id.at(cur_task.output_descs.at(0));
-    auto &output_relation = relations.at(output_desc_id);
-    output_relation.dependence = cur_plan->tensor_dependence.at(output_desc_id);
+    const auto &output_desc = cur_task.output_descs.at(0);
+    auto &output_relation = relations.at(desc_ptr_to_id.at(output_desc));
     if (kernel.inplace) {
+      auto &input_relation =
+          relations.at(desc_ptr_to_id.at(cur_task.input_descs.at(0)));
       input_relation.dependence = 0;
       output_relation.v_block = input_relation.v_block;
     } else {
-      const auto &output_desc = cur_task.output_descs.at(0);
       output_relation.v_block = gmp.allocate(
           element_num(output_desc->max_shape) * type_size(output_desc->dtype),
           kAlign);
     }
-    offsets.at(output_desc_id) = output_relation.v_block.offset;
+  }
+
+  void operator()(const EmbeddingKernel & /*unused*/) {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+
+    const auto &weight_desc = cur_task.input_descs.at(1);
+    auto weight_desc_id = desc_ptr_to_id.at(weight_desc);
+    auto v_block = gmp.allocate(element_num(weight_desc->max_shape) *
+                                    type_size(weight_desc->dtype),
+                                kAlign);
+    offsets.at(weight_desc_id) = v_block.offset;
+
+    const auto &output_desc = cur_task.output_descs.at(0);
+    auto &output_relation = relations.at(desc_ptr_to_id.at(output_desc));
+    output_relation.v_block = gmp.allocate(element_num(output_desc->max_shape) *
+                                               type_size(output_desc->dtype),
+                                           kAlign);
   }
 };
 
@@ -111,19 +166,21 @@ struct WeightAssigner {
     }
   }
 
-  void operator()(const SiLUKernel & /*unused*/) {}
+  void operator()(const SiLUKernel & /*unused*/) const {}
+
+  void operator()(const EmbeddingKernel &kernel) const {
+    std::vector<size_t> target_shape{kernel.num_embeddings, kernel.hidden_size};
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    const auto &weight_desc = cur_task.input_descs.at(1);
+    TINY_LLM_CHECK(weight_desc->cur_shape == target_shape);
+    auto dst_tensor = desc_to_tensor(
+        {.type = DeviceType::kCuda, .id = ThreadCudaContexts::GetContext().id},
+        *weight_desc, cur_task.inputs.at(1));
+    const auto src_tensor =
+        slice_view_to_tensor(cur_wmw->get_tensor(weight_desc->name));
+    src_tensor.copy_to(dst_tensor);
+  }
 };
-
-template <typename From, typename To>
-auto vector_convert(const std::vector<From> &from) -> std::vector<To> {
-  std::vector<To> to;
-  to.reserve(from.size());
-  std::ranges::transform(
-      from, std::back_inserter(to),
-      [](const auto &elem) -> auto { return static_cast<To>(elem); });
-  return to;
-}
-
 } // namespace
 
 CudaRuntime::CudaRuntime(CudaPlan plan,
@@ -160,6 +217,7 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
   }
 
   WeightAssigner{}.apply(weight_manager_wrapper, plan_);
+  ThreadCudaContexts::Synchronize();
 }
 
 [[nodiscard]] auto CudaRuntime::input_names() const
@@ -183,14 +241,22 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
 void check_input(const CudaRuntime &cuda_runtime, const std::string &name,
                  const Tensor &tensor) {
   TINY_LLM_CHECK(cuda_runtime.plan_.input_infos.contains(name));
+  TINY_LLM_CHECK(
+      cuda_runtime.plan_.plan_config.named_shape_ranges.contains(name));
   TINY_LLM_CHECK(cuda_runtime.input_ptrs_.contains(name));
 
   const auto &desc = cuda_runtime.plan_.tensor_descs.at(
       cuda_runtime.plan_.input_infos.at(name).first);
   TINY_LLM_CHECK(desc.dtype == tensor.dtype());
   TINY_LLM_CHECK(desc.cur_shape.size() == tensor.shape().size());
-  TINY_LLM_CHECK((desc.max_shape <=>
-                  vector_convert<int64_t, size_t>(tensor.shape())) >= 0);
+  const auto &min_shape =
+      cuda_runtime.plan_.plan_config.named_shape_ranges.at(name).min_shape;
+  for (size_t i = 0, i_end = desc.cur_shape.size(); i < i_end; ++i) {
+    TINY_LLM_CHECK(static_cast<size_t>(tensor.shape().at(i)) <=
+                   desc.max_shape.at(i));
+    TINY_LLM_CHECK(static_cast<size_t>(tensor.shape().at(i)) >=
+                   min_shape.at(i));
+  }
 }
 
 void CudaRuntime::bind_input(const std::string &name, const Tensor &tensor) {
@@ -217,13 +283,9 @@ void CudaRuntime::cpu_tensor_copy_to_input(const std::string &name,
   auto &[desc_id, task_ios] = plan_.input_infos.at(name);
   auto &desc = plan_.tensor_descs.at(desc_id);
   desc.cur_shape = vector_convert<int64_t, size_t>(tensor.shape());
-
-  Tensor dst_tensor({.type = DeviceType::kCuda, .id = ctx_.id}, desc.dtype,
-                    tensor.shape(), {}, 0,
-                    std::make_shared<Buffer>(
-                        input_ptrs_.at(name),
-                        element_num(desc.max_shape) * type_size(desc.dtype),
-                        Device{.type = DeviceType::kCuda, .id = ctx_.id}));
+  auto dst_tensor = desc_to_tensor(
+      {.type = DeviceType::kCuda, .id = ThreadCudaContexts::GetContext().id},
+      desc, input_ptrs_.at(name));
   tensor.copy_to(dst_tensor);
   for (const auto &task_io : task_ios) {
     plan_.tasks.at(task_io.task_id).inputs.at(task_io.io_id) =
@@ -246,13 +308,9 @@ void CudaRuntime::output_copy_to_cpu_tensor(const std::string &name,
   TINY_LLM_CHECK(desc.dtype == tensor.dtype());
 
   tensor.reallocate(vector_convert<size_t, int64_t>(desc.cur_shape));
-  const Tensor output_tensor(
-      {.type = DeviceType::kCuda, .id = ctx_.id}, desc.dtype, tensor.shape(),
-      {}, 0,
-      std::make_shared<Buffer>(
-          plan_.tasks.at(task_io.task_id).outputs.at(task_io.io_id),
-          element_num(desc.max_shape) * type_size(desc.dtype),
-          Device{.type = DeviceType::kCuda, .id = ctx_.id}));
+  auto output_tensor = desc_to_tensor(
+      {.type = DeviceType::kCuda, .id = ThreadCudaContexts::GetContext().id},
+      desc, plan_.tasks.at(task_io.task_id).outputs.at(task_io.io_id));
   output_tensor.copy_to(tensor);
 
   ThreadCudaContexts::Synchronize();

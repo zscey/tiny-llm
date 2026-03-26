@@ -27,7 +27,7 @@ TEST(WeightManagers, SafeTensors) {
     EXPECT_FLOAT_EQ(attention_ptr[i], static_cast<float>(10 + i));
   }
 
-  EXPECT_ANY_THROW(manager.get_tensor("random"));
+  EXPECT_ANY_THROW((void)manager.get_tensor("random"));
   std::vector<float> random_vec{100.F, 200.F};
   manager.set_tensor("random", {.dtype = DataType::kFloat32,
                                 .shape = std::vector<int64_t>{2},
