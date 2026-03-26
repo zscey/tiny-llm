@@ -8,9 +8,13 @@
 
 namespace tiny_llm::cuda {
 namespace {
-const auto kKernelGenerator = Visitor{
-    [](const SiLUParam &param) -> SiLUKernel {
+constexpr auto kKernelGenerator = Visitor{
+    [](const SiLUParam &param) -> CudaKernel {
       return SiLUKernel{.inplace = param.inplace};
+    },
+    [](const EmbeddingParam &param) -> CudaKernel {
+      return EmbeddingKernel{.num_embeddings = param.num_embeddings,
+                             .hidden_size = param.hidden_size};
     },
 };
 
@@ -124,8 +128,7 @@ auto create_task(CudaPlan &plan, std::unordered_set<uint32_t> &cache,
   }
 }
 
-auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id,
-                const PlanConfig &plan_config) {
+auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id) {
   const auto &graph_node = graph.nodes.at(node_id)->second;
 
   auto task_id = static_cast<uint32_t>(plan.tasks.size() - 1);
@@ -140,9 +143,10 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id,
 
       if (graph.input_names.contains(tensor_name)) {
         // is input
-        TINY_LLM_CHECK(plan_config.named_max_shapes.contains(tensor_name));
+        TINY_LLM_CHECK(
+            plan.plan_config.named_shape_ranges.contains(tensor_name));
         plan_tensor_desc.cur_shape =
-            plan_config.named_max_shapes.at(tensor_name);
+            plan.plan_config.named_shape_ranges.at(tensor_name).max_shape;
         std::get<0>(plan.input_infos[tensor_name]) = tensor_id;
         std::get<1>(plan.input_infos[tensor_name])
             .emplace_back(task_id, input_id);
@@ -185,8 +189,15 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id,
 }
 } // namespace
 
-auto create_cuda_plan(const Graph &graph, const PlanConfig &plan_config)
-    -> CudaPlan {
+auto create_cuda_plan(const Graph &graph, PlanConfig plan_config) -> CudaPlan {
+  for (const auto &[_, shape_range] : plan_config.named_shape_ranges) {
+    TINY_LLM_CHECK(shape_range.min_shape.size() ==
+                   shape_range.max_shape.size());
+    for (size_t i = 0, i_end = shape_range.min_shape.size(); i < i_end; ++i) {
+      TINY_LLM_CHECK(shape_range.min_shape.at(i) <=
+                     shape_range.max_shape.at(i));
+    }
+  }
   auto topo_order_nodes = topological_order(graph);
   // node id to topo id
   std::vector<uint32_t> nodes_mapping(topo_order_nodes.size());
@@ -195,21 +206,22 @@ auto create_cuda_plan(const Graph &graph, const PlanConfig &plan_config)
   }
 
   CudaPlan plan;
+  plan.plan_config = std::move(plan_config);
   // preserve tensor order, change graph node order to topological order
-  plan.tensor_descs.resize(graph.tensor_infos.size());
+  plan.tensor_descs.reserve(graph.tensor_infos.size());
   plan.tensor_dependence.reserve(graph.tensor_infos.size());
-  std::ranges::transform(graph.tensor_infos,
-                         std::back_inserter(plan.tensor_dependence),
-                         [](const auto &named_tensor_info) -> auto {
-                           return static_cast<uint32_t>(
-                               named_tensor_info->second.consumer_nodes.size());
-                         });
+  for (const auto &named_tensor_info : graph.tensor_infos) {
+    plan.tensor_descs.emplace_back(
+        TensorDesc{.name = named_tensor_info->first});
+    plan.tensor_dependence.emplace_back(
+        named_tensor_info->second.consumer_nodes.size());
+  }
   plan.tasks.reserve(graph.nodes.size());
 
   std::unordered_set<uint32_t> cache;
   for (auto node_id : topo_order_nodes) {
     create_task(plan, cache, graph, node_id, nodes_mapping);
-    bind_descs(plan, graph, node_id, plan_config);
+    bind_descs(plan, graph, node_id);
   }
 
   return plan;

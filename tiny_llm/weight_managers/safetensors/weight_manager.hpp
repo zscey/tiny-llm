@@ -18,7 +18,7 @@ public:
       -> SafeTensorWeightManager &;
   ~SafeTensorWeightManager();
 
-  auto get_tensor(const std::string &name) -> SliceView;
+  [[nodiscard]] auto get_tensor(const std::string &name) const -> SliceView;
 
   void set_tensor(std::string name, SliceView slice_view);
 

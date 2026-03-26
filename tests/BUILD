@@ -14,6 +14,7 @@ cc_test(
         "weight_managers/*",
         "runtime/*",
         "tokenizers/*",
+        "utils/*",
     ]) + select({
         "//platforms/device:cuda": glob([
             "device_managers/cuda/*",

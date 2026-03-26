@@ -1,6 +1,5 @@
+#include "tests/utils/weight_manager.hpp"
 #include "tiny_llm/runtime/cuda/cuda_runtime.hpp"
-#include "tiny_llm/utils/runfile.hpp"
-#include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <cmath>
@@ -13,7 +12,7 @@ auto silu(float f) -> float { return f / (1 + std::exp(-f)); }
 
 TEST(Runtime, CudaRuntime) {
   Graph graph;
-  graph.add_tensor("input1", DataType::kFloat32, {2, 3, 4, 5});
+  graph.add_tensor("input1", DataType::kFloat32, {2, 3, 8});
   graph.add_node("node1",
                  {.input_names = {"input1"}, .output_names = {"node1_out"}},
                  SiLUParam{});
@@ -32,7 +31,9 @@ TEST(Runtime, CudaRuntime) {
   EXPECT_TRUE(is_valid(graph));
 
   auto cuda_plan = cuda::create_cuda_plan(
-      graph, {.named_max_shapes = {{"input1", {2, 3, 4, 8}}}});
+      graph,
+      {.named_shape_ranges = {
+           {"input1", {.min_shape = {2, 1, 8}, .max_shape = {2, 4, 8}}}}});
   // topo res: node2->node3->node1
   { // Check input infos
     EXPECT_EQ(cuda_plan.input_infos.size(), 1);
@@ -59,10 +60,15 @@ TEST(Runtime, CudaRuntime) {
   {
     // Check descs
     EXPECT_EQ(cuda_plan.tensor_descs.size(), 5);
+    EXPECT_EQ(cuda_plan.tensor_descs.at(0).name, "input1");
+    EXPECT_EQ(cuda_plan.tensor_descs.at(1).name, "node1_out");
+    EXPECT_EQ(cuda_plan.tensor_descs.at(2).name, "node2_out");
+    EXPECT_EQ(cuda_plan.tensor_descs.at(3).name, "node3_out");
+    EXPECT_EQ(cuda_plan.tensor_descs.at(4).name, "node4_out");
     for (const auto &desc : cuda_plan.tensor_descs) {
       EXPECT_EQ(desc.dtype, DataType::kFloat32);
-      EXPECT_EQ(desc.cur_shape, (std::vector<size_t>{2, 3, 4, 8}));
-      EXPECT_EQ(desc.max_shape, (std::vector<size_t>{2, 3, 4, 8}));
+      EXPECT_EQ(desc.cur_shape, (std::vector<size_t>{2, 4, 8}));
+      EXPECT_EQ(desc.max_shape, (std::vector<size_t>{2, 4, 8}));
     }
   }
 
@@ -117,11 +123,8 @@ TEST(Runtime, CudaRuntime) {
   }
 
   {
-    cuda::CudaRuntime cuda_runtime(
-        std::move(cuda_plan),
-        WeightManagerWrapper(
-            SafeTensorWeightManager{utils::BazelRunfile::RLocation(
-                "tiny_llm/tests/datas/test.safetensors")}));
+    cuda::CudaRuntime cuda_runtime(std::move(cuda_plan),
+                                   WeightManagerWrapper(TestWeightManager{}));
     EXPECT_TRUE(cuda_runtime.input_names() ==
                 std::vector<std::string>{"input1"});
     auto output_names = cuda_runtime.output_names();
@@ -129,14 +132,16 @@ TEST(Runtime, CudaRuntime) {
     EXPECT_TRUE(
         (output_names == std::vector<std::string>{"node1_out", "node4_out"}));
 
-    Tensor input1({.type = DeviceType::kCpu}, DataType::kFloat32, {2, 3, 4, 10},
-                  true);
+    Tensor input1({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
+                  {2, 3, 7}, true);
     EXPECT_ANY_THROW(cuda_runtime.bind_input("input1", input1));
+    input1 = input1.to({.type = DeviceType::kCpu, .id = 0});
+    input1.reallocate({2, 5, 8});
     EXPECT_ANY_THROW(cuda_runtime.cpu_tensor_copy_to_input("input1", input1));
-    input1.reallocate({2, 3, 4, 1});
+    input1.reallocate({2, 3, 8});
     {
       auto *input1_ptr = input1.data<float>();
-      for (size_t i = 0; i < 24; ++i) {
+      for (size_t i = 0; i < 48; ++i) {
         input1_ptr[i] = 1.F;
       }
     }
@@ -145,26 +150,25 @@ TEST(Runtime, CudaRuntime) {
 
     Tensor node1_out({.type = DeviceType::kCpu}, DataType::kFloat32, {2}, true);
     cuda_runtime.output_copy_to_cpu_tensor("node1_out", node1_out);
-    EXPECT_EQ(node1_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
+    EXPECT_EQ(node1_out.shape(), (std::vector<int64_t>{2, 3, 8}));
     {
       const auto *node1_out_ptr = node1_out.data<float>();
       float target = silu(1.F);
-      for (size_t i = 0; i < 24; ++i) {
+      for (size_t i = 0; i < 48; ++i) {
         EXPECT_FLOAT_EQ(node1_out_ptr[i], target);
       }
     }
     Tensor node4_out({.type = DeviceType::kCudaHost}, DataType::kFloat32,
                      {2, 3, 4, 12}, true);
     cuda_runtime.output_copy_to_cpu_tensor("node4_out", node4_out);
-    EXPECT_EQ(node4_out.shape(), (std::vector<int64_t>{2, 3, 4, 1}));
+    EXPECT_EQ(node4_out.shape(), (std::vector<int64_t>{2, 3, 8}));
     {
       const auto *node4_out_ptr = node4_out.data<float>();
       float target = silu(silu(silu(1.F)));
-      for (size_t i = 0; i < 24; ++i) {
+      for (size_t i = 0; i < 48; ++i) {
         EXPECT_FLOAT_EQ(node4_out_ptr[i], target);
       }
     }
   }
 }
-
 } // namespace tiny_llm

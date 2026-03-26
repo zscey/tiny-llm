@@ -7,7 +7,11 @@
 
 namespace tiny_llm::cuda {
 struct PlanConfig {
-  std::unordered_map<std::string, std::vector<size_t>> named_max_shapes;
+  struct ShapeRange {
+    std::vector<size_t> min_shape;
+    std::vector<size_t> max_shape;
+  };
+  std::unordered_map<std::string, ShapeRange> named_shape_ranges;
 };
 
 struct CudaPlan {
@@ -39,6 +43,8 @@ struct CudaPlan {
       input_infos;
   // name -> {desc_id, task_output}
   std::unordered_map<std::string, std::pair<uint32_t, TaskIO>> output_infos;
+
+  PlanConfig plan_config;
 };
 
 /**
@@ -48,6 +54,5 @@ struct CudaPlan {
  * @param plan_config
  * @return CudaPlan
  */
-auto create_cuda_plan(const Graph &graph, const PlanConfig &plan_config)
-    -> CudaPlan;
+auto create_cuda_plan(const Graph &graph, PlanConfig plan_config) -> CudaPlan;
 } // namespace tiny_llm::cuda

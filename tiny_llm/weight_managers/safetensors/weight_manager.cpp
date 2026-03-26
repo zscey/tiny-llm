@@ -70,7 +70,9 @@ auto SafeTensorWeightManager::operator=(
   return *this;
 }
 
-auto SafeTensorWeightManager::get_tensor(const std::string &name) -> SliceView {
+[[nodiscard]] auto
+SafeTensorWeightManager::get_tensor(const std::string &name) const
+    -> SliceView {
   TINY_LLM_CHECK(!name.empty());
   auto iter = user_defined_weights_.find(name);
   if (iter != user_defined_weights_.end()) {
