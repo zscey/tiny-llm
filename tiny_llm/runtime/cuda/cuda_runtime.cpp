@@ -1,5 +1,4 @@
 #include "tiny_llm/runtime/cuda/cuda_runtime.hpp"
-#include "cuda_kernels.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
 #include "tiny_llm/runtime/greedy_memory_planer.hpp"
@@ -165,8 +164,7 @@ struct SizeCalculator {
 
     for (uint32_t i = 0; i < 2; ++i) {
       const auto &cur_desc = cur_task.output_descs.at(i);
-      auto cur_desc_id = desc_ptr_to_id.at(cur_desc);
-      auto &cur_relation = relations.at(cur_desc_id);
+      auto &cur_relation = relations.at(desc_ptr_to_id.at(cur_desc));
       if (kernel.pin) {
         cur_relation.dependence = 0;
       }
