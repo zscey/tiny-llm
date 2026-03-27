@@ -37,30 +37,62 @@ public:
   void execute(const void *const *inputs, void *const *outputs) const;
 };
 
-// class RopeKernel {
-// public:
-//   uint32_t max_len{};
-//   uint32_t head_dim{};
-//   double theta{};
+class RopeKernel {
+public:
+  uint32_t max_len{};
+  uint32_t head_dim{};
+  double theta{};
+  bool pin{};
 
-//   /// @brief {} -{cos, sin}
-//   void dtype_shape_infer(const TensorDesc *const *input_descs,
-//                          TensorDesc *const *output_descs) const;
-//   void execute(const void *const *inputs, void *const *outputs) const;
-// };
+  mutable bool initialized{};
 
-// class RMSNormKernel {
-// public:
-//   uint32_t hidden_size{};
-//   float eps{};
+  /// @brief {} -> {cos, sin}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs) const;
+  void execute(const void *const *inputs, void *const *outputs) const;
+};
 
-//   size_t element_size{};
+class RMSNormKernel {
+public:
+  uint32_t hidden_size{};
+  float eps{};
+  bool inplace{};
 
-//   /// @brief {input, weight} -{output}
-//   void dtype_shape_infer(const TensorDesc *const *input_descs,
-//                          TensorDesc *const *output_descs);
-//   void execute(const void *const *inputs, void *const *outputs) const;
-// };
+  size_t element_size{};
+
+  /// @brief {input, weight} -> {output}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs);
+  void execute(const void *const *inputs, void *const *outputs) const;
+};
+
+class AddKernel {
+public:
+  uint32_t left_idx{0};
+  uint32_t right_idx{1};
+  uint32_t out_idx{2};
+
+  size_t element_size{};
+
+  /// @brief {left, right} -> {output}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs);
+  void execute(const void *const *inputs, void *const *outputs) const;
+};
+
+class MulKernel {
+public:
+  uint32_t left_idx{0};
+  uint32_t right_idx{1};
+  uint32_t out_idx{2};
+
+  size_t element_size{};
+
+  /// @brief {left, right} -> {output}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs);
+  void execute(const void *const *inputs, void *const *outputs) const;
+};
 
 // class LinearKernel {
 // public:
@@ -103,5 +135,6 @@ public:
 //   void execute(const void *const *inputs, void *const *outputs) const;
 // };
 
-using CudaKernel = std::variant<SiLUKernel, EmbeddingKernel>;
+using CudaKernel = std::variant<SiLUKernel, EmbeddingKernel, RopeKernel,
+                                RMSNormKernel, AddKernel, MulKernel>;
 } // namespace tiny_llm::cuda

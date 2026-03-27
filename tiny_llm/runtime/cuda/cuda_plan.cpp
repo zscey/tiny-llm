@@ -16,6 +16,27 @@ constexpr auto kKernelGenerator = Visitor{
       return EmbeddingKernel{.num_embeddings = param.num_embeddings,
                              .hidden_size = param.hidden_size};
     },
+    [](const RopeParam &param) -> CudaKernel {
+      return RopeKernel{.max_len = param.max_len,
+                        .head_dim = param.head_dim,
+                        .theta = param.theta,
+                        .pin = param.pin};
+    },
+    [](const RMSNormParam &param) -> CudaKernel {
+      return RMSNormKernel{.hidden_size = param.hidden_size,
+                           .eps = param.eps,
+                           .inplace = param.inplace};
+    },
+    [](const AddParam &param) -> CudaKernel {
+      return AddKernel{.left_idx = param.left_idx,
+                       .right_idx = param.right_idx,
+                       .out_idx = param.out_idx};
+    },
+    [](const MulParam &param) -> CudaKernel {
+      return MulKernel{.left_idx = param.left_idx,
+                       .right_idx = param.right_idx,
+                       .out_idx = param.out_idx};
+    },
 };
 
 enum class Status : std::uint8_t {
