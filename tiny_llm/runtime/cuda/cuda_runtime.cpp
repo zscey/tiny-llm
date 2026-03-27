@@ -96,6 +96,18 @@ struct SizeCalculator {
     for (uint32_t i = 0, i_end = plan.tasks.size(); i < i_end; ++i) {
       cur_task_id = i;
       const auto &cur_task = plan.tasks.at(cur_task_id);
+      for (const auto *desc_ptr : cur_task.output_descs) {
+        auto desc_id = desc_ptr_to_id.at(desc_ptr);
+        relations.at(desc_id).dependence =
+            cur_plan->tensor_dependence.at(desc_id);
+      }
+      // visitor
+      // 1. set the `v_block` of the output
+      // 2. [option, inplace] reset the `dependence` of the input to 0
+      // 3. [option, initializer] set the `dependence`, `v_block`, `offset` of
+      // the initializer
+      // 4. [option, rope] reset the `dependence` of the outputs to 0 in the pin
+      // mode
       std::visit(*this, cur_task.kernel);
       for (const auto *desc_ptr : cur_task.input_descs) {
         auto &cur_relation = relations.at(desc_ptr_to_id.at(desc_ptr));
@@ -108,45 +120,87 @@ struct SizeCalculator {
       }
       for (const auto *desc_ptr : cur_task.output_descs) {
         auto desc_id = desc_ptr_to_id.at(desc_ptr);
-        auto &cur_relation = relations.at(desc_id);
-        cur_relation.dependence = cur_plan->tensor_dependence.at(desc_id);
-        offsets.at(desc_id) = cur_relation.v_block.offset;
+        offsets.at(desc_id) = relations.at(desc_id).v_block.offset;
       }
     }
   }
 
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+  void set_v_block(const TensorDesc *from_desc, const TensorDesc *to_desc) {
+    auto &to_relation = relations.at(desc_ptr_to_id.at(to_desc));
+    if (from_desc != nullptr) {
+      auto &from_relation = relations.at(desc_ptr_to_id.at(from_desc));
+      from_relation.dependence = 0;
+      to_relation.v_block = from_relation.v_block;
+    } else {
+      to_relation.v_block = gmp.allocate(
+          element_num(to_desc->max_shape) * type_size(to_desc->dtype), kAlign);
+    }
+  }
+
+  void assign_initializer(const TensorDesc *desc) {
+    auto desc_id = desc_ptr_to_id.at(desc);
+    auto &cur_relation = relations.at(desc_id);
+    cur_relation.dependence = 0;
+    cur_relation.v_block = gmp.allocate(
+        element_num(desc->max_shape) * type_size(desc->dtype), kAlign);
+    offsets.at(desc_id) = cur_relation.v_block.offset;
+  }
+
   void operator()(const SiLUKernel &kernel) {
     const auto &cur_task = cur_plan->tasks.at(cur_task_id);
-
-    const auto &output_desc = cur_task.output_descs.at(0);
-    auto &output_relation = relations.at(desc_ptr_to_id.at(output_desc));
-    if (kernel.inplace) {
-      auto &input_relation =
-          relations.at(desc_ptr_to_id.at(cur_task.input_descs.at(0)));
-      input_relation.dependence = 0;
-      output_relation.v_block = input_relation.v_block;
-    } else {
-      output_relation.v_block = gmp.allocate(
-          element_num(output_desc->max_shape) * type_size(output_desc->dtype),
-          kAlign);
-    }
+    set_v_block(kernel.inplace ? cur_task.input_descs.at(0) : nullptr,
+                cur_task.output_descs.at(0));
   }
 
   void operator()(const EmbeddingKernel & /*unused*/) {
     const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    assign_initializer(cur_task.input_descs.at(1));
+    set_v_block(nullptr, cur_task.output_descs.at(0));
+  }
 
-    const auto &weight_desc = cur_task.input_descs.at(1);
-    auto weight_desc_id = desc_ptr_to_id.at(weight_desc);
-    auto v_block = gmp.allocate(element_num(weight_desc->max_shape) *
-                                    type_size(weight_desc->dtype),
-                                kAlign);
-    offsets.at(weight_desc_id) = v_block.offset;
+  void operator()(const RopeKernel &kernel) {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
 
-    const auto &output_desc = cur_task.output_descs.at(0);
-    auto &output_relation = relations.at(desc_ptr_to_id.at(output_desc));
-    output_relation.v_block = gmp.allocate(element_num(output_desc->max_shape) *
-                                               type_size(output_desc->dtype),
-                                           kAlign);
+    for (uint32_t i = 0; i < 2; ++i) {
+      const auto &cur_desc = cur_task.output_descs.at(i);
+      auto &cur_relation = relations.at(desc_ptr_to_id.at(cur_desc));
+      if (kernel.pin) {
+        cur_relation.dependence = 0;
+      }
+      cur_relation.v_block = gmp.allocate(element_num(cur_desc->max_shape) *
+                                              type_size(cur_desc->dtype),
+                                          kAlign);
+    }
+  }
+
+  void operator()(const RMSNormKernel &kernel) {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    assign_initializer(cur_task.input_descs.at(1));
+    set_v_block(kernel.inplace ? cur_task.input_descs.at(0) : nullptr,
+                cur_task.output_descs.at(0));
+  }
+
+  void operator()(const AddKernel &kernel) {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    const TensorDesc *from_desc{};
+    if (kernel.out_idx == kernel.left_idx) {
+      from_desc = cur_task.input_descs.at(0);
+    } else if (kernel.out_idx == kernel.right_idx) {
+      from_desc = cur_task.input_descs.at(1);
+    }
+    set_v_block(from_desc, cur_task.output_descs.at(0));
+  }
+
+  void operator()(const MulKernel &kernel) {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    const TensorDesc *from_desc{};
+    if (kernel.out_idx == kernel.left_idx) {
+      from_desc = cur_task.input_descs.at(0);
+    } else if (kernel.out_idx == kernel.right_idx) {
+      from_desc = cur_task.input_descs.at(1);
+    }
+    set_v_block(from_desc, cur_task.output_descs.at(0));
   }
 };
 
@@ -166,20 +220,36 @@ struct WeightAssigner {
     }
   }
 
+  void check_and_copy_weight(const TensorDesc *desc, const void *data_ptr,
+                             const std::vector<size_t> &target_shape) const {
+    TINY_LLM_CHECK(desc->cur_shape == target_shape);
+    auto dst_tensor = desc_to_tensor(
+        {.type = DeviceType::kCuda, .id = ThreadCudaContexts::GetContext().id},
+        *desc, data_ptr);
+    const auto src_tensor =
+        slice_view_to_tensor(cur_wmw->get_tensor(desc->name));
+    src_tensor.copy_to(dst_tensor);
+  }
+
   void operator()(const SiLUKernel & /*unused*/) const {}
 
   void operator()(const EmbeddingKernel &kernel) const {
-    std::vector<size_t> target_shape{kernel.num_embeddings, kernel.hidden_size};
     const auto &cur_task = cur_plan->tasks.at(cur_task_id);
-    const auto &weight_desc = cur_task.input_descs.at(1);
-    TINY_LLM_CHECK(weight_desc->cur_shape == target_shape);
-    auto dst_tensor = desc_to_tensor(
-        {.type = DeviceType::kCuda, .id = ThreadCudaContexts::GetContext().id},
-        *weight_desc, cur_task.inputs.at(1));
-    const auto src_tensor =
-        slice_view_to_tensor(cur_wmw->get_tensor(weight_desc->name));
-    src_tensor.copy_to(dst_tensor);
+    check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
+                          {kernel.num_embeddings, kernel.hidden_size});
   }
+
+  void operator()(const RopeKernel & /*unused*/) const {}
+
+  void operator()(const RMSNormKernel &kernel) const {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
+                          {kernel.hidden_size});
+  }
+
+  void operator()(const AddKernel & /*unused*/) const {}
+
+  void operator()(const MulKernel & /*unused*/) const {}
 };
 } // namespace
 

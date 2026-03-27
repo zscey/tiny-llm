@@ -148,8 +148,7 @@ auto is_valid_nodes(const Graph &g) -> bool {
 } // namespace
 
 auto is_valid(const Graph &g) -> bool {
-  if (g.input_names.empty() || g.output_names.empty() ||
-      !is_valid_map(g.tensor_name_to_idx) ||
+  if (g.output_names.empty() || !is_valid_map(g.tensor_name_to_idx) ||
       !is_valid_map(g.node_name_to_idx) ||
       g.tensor_name_to_idx.size() != g.tensor_infos.size() ||
       g.node_name_to_idx.size() != g.nodes.size() ||
@@ -180,6 +179,13 @@ auto is_valid(const Graph &g) -> bool {
 
   // Check if each output is reachable from the input.
   std::vector<bool> is_visited(g.tensor_infos.size(), false);
+  for (const auto &named_node : g.nodes) {
+    if (input_num(named_node->second.param) == 0) {
+      for (auto id : named_node->second.output_tensors) {
+        is_visited.at(id) = true;
+      }
+    }
+  }
   std::queue<uint32_t> q;
   for (const auto &name : g.input_names) {
     q.push(g.tensor_name_to_idx.at(name));

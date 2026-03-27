@@ -1,5 +1,6 @@
 #include "tiny_llm/runtime/cuda/cuda_kernels.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/ops/cuda/arithmetic.hpp"
 #include "tiny_llm/ops/cuda/embedding.hpp"
 #include "tiny_llm/ops/cuda/flash_attention.hpp"
 #include "tiny_llm/ops/cuda/gemm.hpp"
@@ -22,6 +23,14 @@ void check_desc_dtype_and_shape(const TensorDesc &desc, DataType dtype,
   TINY_LLM_CHECK(!desc.cur_shape.empty());
   TINY_LLM_CHECK(desc.cur_shape.back() == last_dim);
 }
+
+auto element_num(const std::vector<size_t> &shape) -> size_t {
+  return shape.empty()
+             ? 0
+             : std::accumulate(
+                   shape.begin(), shape.end(), 1,
+                   [](const auto &a, const auto &b) -> auto { return a * b; });
+}
 } // namespace
 
 void SiLUKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
@@ -32,12 +41,7 @@ void SiLUKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
   auto *output_desc = output_descs[0];
   output_desc->dtype = input_desc->dtype;
   output_desc->cur_shape = input_desc->cur_shape;
-  element_size =
-      input_desc->cur_shape.empty()
-          ? 0
-          : std::accumulate(input_desc->cur_shape.begin(),
-                            input_desc->cur_shape.end(), 1,
-                            [](auto a, auto b) -> auto { return a * b; });
+  element_size = element_num(input_desc->cur_shape);
 }
 
 void SiLUKernel::execute(const void *const *inputs,
@@ -58,12 +62,7 @@ void EmbeddingKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
   output_desc->dtype = weight_desc->dtype;
   output_desc->cur_shape = input_desc->cur_shape;
   output_desc->cur_shape.emplace_back(hidden_size);
-  element_size =
-      input_desc->cur_shape.empty()
-          ? 0
-          : std::accumulate(input_desc->cur_shape.begin(),
-                            input_desc->cur_shape.end(), 1,
-                            [](auto a, auto b) -> auto { return a * b; });
+  element_size = element_num(input_desc->cur_shape);
 }
 
 void EmbeddingKernel::execute(const void *const *inputs,
@@ -73,43 +72,86 @@ void EmbeddingKernel::execute(const void *const *inputs,
             static_cast<float *>(outputs[0]), hidden_size, element_size);
 }
 
-// void RopeKernel::dtype_shape_infer(const TensorDesc *const * /*input_descs*/,
-//                                    TensorDesc *const *output_descs) const {
-//   for (uint32_t i = 0; i < 2; ++i) {
-//     output_descs[i]->dtype = DataType::kFloat32;
-//     output_descs[i]->cur_shape = {max_len, head_dim / 2};
-//   }
-// }
+void RopeKernel::dtype_shape_infer(const TensorDesc *const * /*input_descs*/,
+                                   TensorDesc *const *output_descs) const {
+  for (uint32_t i = 0; i < 2; ++i) {
+    output_descs[i]->dtype = DataType::kFloat32;
+    output_descs[i]->cur_shape = {max_len, head_dim / 2};
+  }
+}
 
-// void RopeKernel::execute(const void *const * /*inputs*/,
-//                          void *const *outputs) const {
-//   rope(static_cast<float *>(outputs[0]), static_cast<float *>(outputs[1]),
-//        max_len, head_dim, theta);
-// }
+void RopeKernel::execute(const void *const * /*inputs*/,
+                         void *const *outputs) const {
+  if (pin && initialized) {
+    return;
+  }
+  rope(static_cast<float *>(outputs[0]), static_cast<float *>(outputs[1]),
+       max_len, head_dim, theta);
+  initialized = true;
+}
 
-// void RMSNormKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
-//                                       TensorDesc *const *output_descs) {
-//   const auto *input_desc = input_descs[0];
-//   check_desc_dtype_and_shape(*input_desc, DataType::kFloat32, hidden_size);
-//   const auto *weight_desc = input_descs[1];
-//   check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
-//                              std::vector<size_t>{hidden_size});
+void RMSNormKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
+                                      TensorDesc *const *output_descs) {
+  const auto *input_desc = input_descs[0];
+  check_desc_dtype_and_shape(*input_desc, DataType::kFloat32, hidden_size);
+  const auto *weight_desc = input_descs[1];
+  check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
+                             std::vector<size_t>{hidden_size});
 
-//   auto *output_desc = output_descs[0];
-//   output_desc->dtype = input_desc->dtype;
-//   output_desc->cur_shape = input_desc->cur_shape;
-//   element_size = std::max(
-//       1, std::accumulate(input_desc->cur_shape.begin(),
-//                          std::prev(input_desc->cur_shape.end()), 1,
-//                          [](auto a, auto b) -> auto { return a * b; }));
-// }
+  auto *output_desc = output_descs[0];
+  output_desc->dtype = input_desc->dtype;
+  output_desc->cur_shape = input_desc->cur_shape;
+  element_size = std::accumulate(input_desc->cur_shape.begin(),
+                                 std::prev(input_desc->cur_shape.end()), 1,
+                                 [](auto a, auto b) -> auto { return a * b; });
+}
 
-// void RMSNormKernel::execute(const void *const *inputs,
-//                             void *const *outputs) const {
-//   rms_norm(static_cast<const float *>(inputs[0]),
-//            static_cast<const float *>(inputs[1]),
-//            static_cast<float *>(outputs[0]), element_size, hidden_size, eps);
-// }
+void RMSNormKernel::execute(const void *const *inputs,
+                            void *const *outputs) const {
+  rms_norm(static_cast<const float *>(inputs[0]),
+           static_cast<const float *>(inputs[1]),
+           static_cast<float *>(outputs[0]), element_size, hidden_size, eps);
+}
+
+void AddKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
+                                  TensorDesc *const *output_descs) {
+  const auto *left_desc = input_descs[0];
+  const auto *right_desc = input_descs[1];
+  TINY_LLM_CHECK(left_desc->dtype == right_desc->dtype);
+  TINY_LLM_CHECK(left_desc->cur_shape == right_desc->cur_shape);
+
+  auto *output_desc = output_descs[0];
+  output_desc->dtype = left_desc->dtype;
+  output_desc->cur_shape = left_desc->cur_shape;
+  element_size = element_num(left_desc->cur_shape);
+}
+
+void AddKernel::execute(const void *const *inputs, void *const *outputs) const {
+  arithmetic(static_cast<const float *>(inputs[0]),
+             static_cast<const float *>(inputs[1]),
+             static_cast<float *>(outputs[0]), element_size,
+             ArithmeticType::kAdd);
+}
+
+void MulKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
+                                  TensorDesc *const *output_descs) {
+  const auto *left_desc = input_descs[0];
+  const auto *right_desc = input_descs[1];
+  TINY_LLM_CHECK(left_desc->dtype == right_desc->dtype);
+  TINY_LLM_CHECK(left_desc->cur_shape == right_desc->cur_shape);
+
+  auto *output_desc = output_descs[0];
+  output_desc->dtype = left_desc->dtype;
+  output_desc->cur_shape = left_desc->cur_shape;
+  element_size = element_num(left_desc->cur_shape);
+}
+
+void MulKernel::execute(const void *const *inputs, void *const *outputs) const {
+  arithmetic(static_cast<const float *>(inputs[0]),
+             static_cast<const float *>(inputs[1]),
+             static_cast<float *>(outputs[0]), element_size,
+             ArithmeticType::kMul);
+}
 
 // void LinearKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
 //                                      TensorDesc *const *output_descs) {

@@ -21,7 +21,7 @@ TEST(CudaOps, SiLU) {
 
   cuda::silu(src.data<float>(), dst.data<float>(), 2);
   dst = dst.to({.type = DeviceType::kCpu});
-  ThreadCudaContexts::SynchronizeDevice();
+  ThreadCudaContexts::Synchronize();
 
   const auto *dst_ptr = dst.data<float>();
   EXPECT_FLOAT_EQ(dst_ptr[0], silu(0.F));

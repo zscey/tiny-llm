@@ -93,9 +93,7 @@ TEST(Runtime, Embedding) {
 
     cuda::CudaRuntime cuda_runtime(std::move(cuda_plan), wmw);
     EXPECT_TRUE(cuda_runtime.input_names() == std::vector<std::string>{"ids"});
-    auto output_names = cuda_runtime.output_names();
-    std::ranges::sort(output_names);
-    EXPECT_TRUE((output_names == std::vector<std::string>{"out"}));
+    EXPECT_TRUE(cuda_runtime.output_names() == std::vector<std::string>{"out"});
 
     {
       Tensor ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32, {1, 2},
@@ -122,24 +120,26 @@ TEST(Runtime, Embedding) {
       }
     }
     {
-      Tensor ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32, {1, 2},
+      Tensor ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32, {1, 3},
                  true);
       {
         auto *ids_ptr = ids.data<uint32_t>();
         ids_ptr[0] = 2;
         ids_ptr[1] = 0;
+        ids_ptr[2] = 4;
       }
       cuda_runtime.cpu_tensor_copy_to_input("ids", ids);
       cuda_runtime.execute();
 
       Tensor out({.type = DeviceType::kCpu}, DataType::kFloat32, {2}, true);
       cuda_runtime.output_copy_to_cpu_tensor("out", out);
-      EXPECT_EQ(out.shape(), (std::vector<int64_t>{1, 2, 4}));
+      EXPECT_EQ(out.shape(), (std::vector<int64_t>{1, 3, 4}));
       {
         const auto *out_ptr = out.data<float>();
         for (size_t i = 0; i < 4; ++i) {
           EXPECT_FLOAT_EQ(out_ptr[i], static_cast<float>(i) + 8.F);
           EXPECT_FLOAT_EQ(out_ptr[i + 4], static_cast<float>(i));
+          EXPECT_FLOAT_EQ(out_ptr[i + 8], static_cast<float>(i) + 16.F);
         }
       }
     }
