@@ -37,6 +37,10 @@ constexpr auto kKernelGenerator = Visitor{
                        .right_idx = param.right_idx,
                        .out_idx = param.out_idx};
     },
+    [](const LinearParam &param) -> CudaKernel {
+      return LinearKernel{
+          .in_dim = param.in_dim, .out_dim = param.out_dim, .bias = param.bias};
+    },
 };
 
 enum class Status : std::uint8_t {

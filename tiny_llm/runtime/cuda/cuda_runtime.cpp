@@ -202,6 +202,15 @@ struct SizeCalculator {
     }
     set_v_block(from_desc, cur_task.output_descs.at(0));
   }
+
+  void operator()(const LinearKernel &kernel) {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    assign_initializer(cur_task.input_descs.at(1));
+    if (kernel.bias) {
+      assign_initializer(cur_task.input_descs.at(2));
+    }
+    set_v_block(nullptr, cur_task.output_descs.at(0));
+  }
 };
 
 struct WeightAssigner {
@@ -250,6 +259,16 @@ struct WeightAssigner {
   void operator()(const AddKernel & /*unused*/) const {}
 
   void operator()(const MulKernel & /*unused*/) const {}
+
+  void operator()(const LinearKernel &kernel) const {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
+                          {kernel.out_dim, kernel.in_dim});
+    if (kernel.bias) {
+      check_and_copy_weight(cur_task.input_descs.at(2), cur_task.inputs.at(2),
+                            {kernel.out_dim});
+    }
+  }
 };
 } // namespace
 

@@ -153,37 +153,36 @@ void MulKernel::execute(const void *const *inputs, void *const *outputs) const {
              ArithmeticType::kMul);
 }
 
-// void LinearKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
-//                                      TensorDesc *const *output_descs) {
-//   const auto *input_desc = input_descs[0];
-//   check_desc_dtype_and_shape(*input_desc, DataType::kFloat32, in_dim);
-//   const auto *weight_desc = input_descs[1];
-//   check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
-//                              {out_dim, in_dim});
-//   if (bias) {
-//     const auto *bias_desc = input_descs[2];
-//     check_desc_dtype_and_shape(*bias_desc, DataType::kFloat32,
-//                                std::vector<size_t>{out_dim});
-//   }
+void LinearKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
+                                     TensorDesc *const *output_descs) {
+  const auto *input_desc = input_descs[0];
+  check_desc_dtype_and_shape(*input_desc, DataType::kFloat32, in_dim);
+  const auto *weight_desc = input_descs[1];
+  check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
+                             {out_dim, in_dim});
+  if (bias) {
+    const auto *bias_desc = input_descs[2];
+    check_desc_dtype_and_shape(*bias_desc, DataType::kFloat32,
+                               std::vector<size_t>{out_dim});
+  }
 
-//   auto *output_desc = output_descs[0];
-//   output_desc->dtype = input_desc->dtype;
-//   output_desc->cur_shape = input_desc->cur_shape;
-//   output_desc->cur_shape.back() = out_dim;
-//   element_size = std::max(
-//       1, std::accumulate(input_desc->cur_shape.begin(),
-//                          std::prev(input_desc->cur_shape.end()), 1,
-//                          [](auto a, auto b) -> auto { return a * b; }));
-// }
+  auto *output_desc = output_descs[0];
+  output_desc->dtype = input_desc->dtype;
+  output_desc->cur_shape = input_desc->cur_shape;
+  output_desc->cur_shape.back() = out_dim;
+  element_size = std::accumulate(input_desc->cur_shape.begin(),
+                                 std::prev(input_desc->cur_shape.end()), 1,
+                                 [](auto a, auto b) -> auto { return a * b; });
+}
 
-// void LinearKernel::execute(const void *const *inputs,
-//                            void *const *outputs) const {
-//   const auto *bias_ptr = bias ? static_cast<const float *>(inputs[2]) :
-//   nullptr; gemm_row_major(static_cast<const float *>(inputs[0]),
-//                  static_cast<const float *>(inputs[1]), bias_ptr,
-//                  static_cast<float *>(outputs[0]), element_size, in_dim,
-//                  out_dim);
-// }
+void LinearKernel::execute(const void *const *inputs,
+                           void *const *outputs) const {
+  const auto *bias_ptr = bias ? static_cast<const float *>(inputs[2]) : nullptr;
+  gemm_row_major(static_cast<const float *>(inputs[0]),
+                 static_cast<const float *>(inputs[1]), bias_ptr,
+                 static_cast<float *>(outputs[0]), element_size, in_dim,
+                 out_dim);
+}
 
 // void CausalAttentionKernel::dtype_shape_infer(
 //     const TensorDesc *const *input_descs, TensorDesc *const *output_descs) {
