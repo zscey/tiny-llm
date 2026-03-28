@@ -45,12 +45,12 @@ public:
   uint32_t out_idx{2};
 };
 
-// class LinearParam {
-// public:
-//   uint32_t in_dim{};
-//   uint32_t out_dim{};
-//   bool bias{false};
-// };
+class LinearParam {
+public:
+  uint32_t in_dim{};
+  uint32_t out_dim{};
+  bool bias{false};
+};
 
 // class AttentionParam {
 // public:
@@ -61,7 +61,7 @@ public:
 // };
 
 using Param = std::variant<SiLUParam, EmbeddingParam, RopeParam, RMSNormParam,
-                           AddParam, MulParam>;
+                           AddParam, MulParam, LinearParam>;
 
 namespace details {
 template <typename T> constexpr auto extern_input_num_impl() -> uint32_t {

@@ -94,19 +94,19 @@ public:
   void execute(const void *const *inputs, void *const *outputs) const;
 };
 
-// class LinearKernel {
-// public:
-//   uint32_t in_dim{};
-//   uint32_t out_dim{};
-//   bool bias{};
+class LinearKernel {
+public:
+  uint32_t in_dim{};
+  uint32_t out_dim{};
+  bool bias{};
 
-//   size_t element_size{};
+  size_t element_size{};
 
-//   /// @brief {input, weight, [bias]} -{output}
-//   void dtype_shape_infer(const TensorDesc *const *input_descs,
-//                          TensorDesc *const *output_descs);
-//   void execute(const void *const *inputs, void *const *outputs) const;
-// };
+  /// @brief {input, weight, [bias]} -{output}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs);
+  void execute(const void *const *inputs, void *const *outputs) const;
+};
 
 // // with kv-cache
 // class CausalAttentionKernel {
@@ -135,6 +135,7 @@ public:
 //   void execute(const void *const *inputs, void *const *outputs) const;
 // };
 
-using CudaKernel = std::variant<SiLUKernel, EmbeddingKernel, RopeKernel,
-                                RMSNormKernel, AddKernel, MulKernel>;
+using CudaKernel =
+    std::variant<SiLUKernel, EmbeddingKernel, RopeKernel, RMSNormKernel,
+                 AddKernel, MulKernel, LinearKernel>;
 } // namespace tiny_llm::cuda
