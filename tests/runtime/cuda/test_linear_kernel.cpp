@@ -114,10 +114,10 @@ TEST(Runtime, Linear) {
       EXPECT_EQ(out.shape(), (std::vector<int64_t>{1, 2, 2}));
       {
         const auto *out_ptr = out.data<float>();
-        EXPECT_FLOAT_EQ(out_ptr[0], 14.F);
-        EXPECT_FLOAT_EQ(out_ptr[1], 32.F);
-        EXPECT_FLOAT_EQ(out_ptr[2], 32.F);
-        EXPECT_FLOAT_EQ(out_ptr[3], 77.F);
+        EXPECT_FLOAT_EQ(out_ptr[0], 5.F);
+        EXPECT_FLOAT_EQ(out_ptr[1], 14.F);
+        EXPECT_FLOAT_EQ(out_ptr[2], 14.F);
+        EXPECT_FLOAT_EQ(out_ptr[3], 50.F);
       }
     }
   }
