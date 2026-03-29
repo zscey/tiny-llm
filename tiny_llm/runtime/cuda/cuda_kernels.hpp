@@ -118,7 +118,7 @@ public:
   uint32_t max_len{};
 
   uint32_t batch{};
-  mutable uint32_t seq_len{};
+  uint32_t seq_len{};
   uint32_t hidden_size{};
 
   bool is_prefill{};

@@ -8,47 +8,47 @@
 
 namespace tiny_llm::cuda {
 namespace {
-constexpr auto kKernelGenerator =
-    Visitor{[](const SiLUParam &param) -> CudaKernel {
-              return SiLUKernel{.inplace = param.inplace};
-            },
-            [](const EmbeddingParam &param) -> CudaKernel {
-              return EmbeddingKernel{.num_embeddings = param.num_embeddings,
-                                     .hidden_size = param.hidden_size};
-            },
-            [](const RopeParam &param) -> CudaKernel {
-              return RopeKernel{.max_len = param.max_len,
-                                .head_dim = param.head_dim,
-                                .theta = param.theta,
-                                .pin = param.pin};
-            },
-            [](const RMSNormParam &param) -> CudaKernel {
-              return RMSNormKernel{.hidden_size = param.hidden_size,
-                                   .eps = param.eps,
-                                   .inplace = param.inplace};
-            },
-            [](const AddParam &param) -> CudaKernel {
-              return AddKernel{.left_idx = param.left_idx,
-                               .right_idx = param.right_idx,
-                               .out_idx = param.out_idx};
-            },
-            [](const MulParam &param) -> CudaKernel {
-              return MulKernel{.left_idx = param.left_idx,
-                               .right_idx = param.right_idx,
-                               .out_idx = param.out_idx};
-            },
-            [](const LinearParam &param) -> CudaKernel {
-              return LinearKernel{.in_dim = param.in_dim,
-                                  .out_dim = param.out_dim,
-                                  .bias = param.bias};
-            },
-            [](const CausalAttentionParam &param) -> CudaKernel {
-              return CausalAttentionKernel{.head_dim = param.head_dim,
-                                           .q_head = param.q_head,
-                                           .kv_head = param.kv_head,
-                                           .bias = param.bias,
-                                           .max_len = param.max_len};
-            }};
+constexpr auto kKernelGenerator = Visitor{
+    [](const SiLUParam &param) -> CudaKernel {
+      return SiLUKernel{.inplace = param.inplace};
+    },
+    [](const EmbeddingParam &param) -> CudaKernel {
+      return EmbeddingKernel{.num_embeddings = param.num_embeddings,
+                             .hidden_size = param.hidden_size};
+    },
+    [](const RopeParam &param) -> CudaKernel {
+      return RopeKernel{.max_len = param.max_len,
+                        .head_dim = param.head_dim,
+                        .theta = param.theta,
+                        .pin = param.pin};
+    },
+    [](const RMSNormParam &param) -> CudaKernel {
+      return RMSNormKernel{.hidden_size = param.hidden_size,
+                           .eps = param.eps,
+                           .inplace = param.inplace};
+    },
+    [](const AddParam &param) -> CudaKernel {
+      return AddKernel{.left_idx = param.left_idx,
+                       .right_idx = param.right_idx,
+                       .out_idx = param.out_idx};
+    },
+    [](const MulParam &param) -> CudaKernel {
+      return MulKernel{.left_idx = param.left_idx,
+                       .right_idx = param.right_idx,
+                       .out_idx = param.out_idx};
+    },
+    [](const LinearParam &param) -> CudaKernel {
+      return LinearKernel{
+          .in_dim = param.in_dim, .out_dim = param.out_dim, .bias = param.bias};
+    },
+    [](const CausalAttentionParam &param) -> CudaKernel {
+      return CausalAttentionKernel{.head_dim = param.head_dim,
+                                   .q_head = param.q_head,
+                                   .kv_head = param.kv_head,
+                                   .bias = param.bias,
+                                   .max_len = param.max_len};
+    },
+};
 
 enum class Status : std::uint8_t {
   kWhite,
