@@ -47,17 +47,16 @@ __device__ void fetch_data(const float *from, float *to, uint32_t row_num,
  * key: key_length rows of key
  */
 template <bool IsCausal>
-__device__ auto get_local_s_m_l(const float *query, const float *key,
-                                float *local_s, uint32_t key_length,
-                                uint32_t dim, uint32_t key_step,
-                                uint32_t base_q_idx, uint32_t base_key_idx)
-    -> float2 {
+__device__ auto get_local_s_m(const float *query, const float *key,
+                              float *local_s, uint32_t key_length, uint32_t dim,
+                              uint32_t key_step, uint32_t base_q_idx,
+                              uint32_t base_key_idx) -> float {
   float local_m = -CUDART_INF_F;
-  float local_l{};
   for (uint32_t thread_iter = 0; thread_iter < kThreadIterPerKV;
        ++thread_iter) {
     auto cur_row_k = (thread_iter * kWarpSize) + (threadIdx.x % kWarpSize);
     if (cur_row_k >= key_length) {
+      local_s[thread_iter] = -CUDART_INF_F;
       continue;
     }
     if constexpr (IsCausal) {
@@ -73,10 +72,9 @@ __device__ auto get_local_s_m_l(const float *query, const float *key,
       cur_s += query[i] * cur_key[i];
     }
     local_m = ::max(local_m, cur_s);
-    local_l += ::expf(cur_s);
   }
 
-  return ::make_float2(local_m, local_l);
+  return local_m;
 }
 
 /**
@@ -88,9 +86,8 @@ __device__ auto set_global_m_l_o(const float *value, const float2 &local_m_l,
                                  float &global_l, float *global_o,
                                  uint32_t v_length, uint32_t dim,
                                  uint32_t value_step) {
-  auto cur_m = ::max(local_m_l.x, global_m);
-  auto old_l_o_scale = ::expf(global_m - cur_m);
-  auto cur_l = (old_l_o_scale * global_l) + (::expf(-cur_m) * local_m_l.y);
+  auto old_l_o_scale = ::expf(global_m - local_m_l.x);
+  auto cur_l = (old_l_o_scale * global_l) + local_m_l.y;
   for (uint32_t o_idx = 0, cur_d = threadIdx.x % kWarpSize; cur_d < dim;
        ++o_idx, cur_d += kWarpSize) {
     global_o[o_idx] = old_l_o_scale * global_o[o_idx] * global_l / cur_l;
@@ -106,16 +103,15 @@ __device__ auto set_global_m_l_o(const float *value, const float2 &local_m_l,
 
         auto cur_s =
             ::cuda::device::warp_shuffle_idx(local_s[thread_iter], idx).data;
-        auto soft_max_scale = ::expf(cur_s - cur_m);
         for (uint32_t o_idx = 0, cur_d = threadIdx.x % kWarpSize; cur_d < dim;
              ++o_idx, cur_d += kWarpSize) {
-          global_o[o_idx] += (soft_max_scale * cur_value[cur_d]) / cur_l;
+          global_o[o_idx] += (cur_s * cur_value[cur_d]) / cur_l;
         }
       }
     }
   }
 
-  global_m = cur_m;
+  global_m = local_m_l.x;
   global_l = cur_l;
 }
 
@@ -132,7 +128,7 @@ __global__ void flash_attn_kernel(const float *query, const float *key,
   float global_o[kWarpIterPerTileQ * OutPerThread];
   for (uint32_t i = 0; i < kWarpIterPerTileQ; ++i) {
     global_m[i] = -CUDART_INF_F;
-    global_l[i] = CUDART_MIN_DENORM_F;
+    global_l[i] = 0.F;
     for (uint32_t j = 0; j < OutPerThread; ++j) {
       global_o[(i * OutPerThread) + j] = 0.F;
     }
@@ -170,22 +166,26 @@ __global__ void flash_attn_kernel(const float *query, const float *key,
          ++warp_iter) {
       auto query_buffer_row =
           (warp_iter * kWarpNumPerBlock) + (threadIdx.x / kWarpSize);
-      float2 local_m_l = get_local_s_m_l<IsCausal>(
+      float local_m = get_local_s_m<IsCausal>(
           query_buffer + (static_cast<size_t>(query_buffer_row) * padded_dim),
           key_buffer, &local_s[0], kv_row_num, dim, padded_dim,
           (blockIdx.x * kTileQ) + query_buffer_row, (kv_block_idx * kTileKV));
 
-      local_m_l.x =
-          ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
-              .Max(local_m_l.x);
-      local_m_l.x = ::cuda::device::warp_shuffle_idx(local_m_l.x, 0);
-      local_m_l.y =
-          ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
-              .Sum(local_m_l.y);
-      local_m_l.y = ::cuda::device::warp_shuffle_idx(local_m_l.y, 0);
+      local_m = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
+                    .Max(local_m);
+      local_m = ::cuda::device::warp_shuffle_idx(local_m, 0);
+      local_m = std::max(local_m, global_m[warp_iter]);
+      float local_l{};
+      for (float &cur_s : local_s) {
+        cur_s = ::exp(cur_s - local_m);
+        local_l += cur_s;
+      }
+      local_l = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
+                    .Sum(local_l);
+      local_l = ::cuda::device::warp_shuffle_idx(local_l, 0);
 
-      set_global_m_l_o(value_buffer, local_m_l, &local_s[0],
-                       global_m[warp_iter], global_l[warp_iter],
+      set_global_m_l_o(value_buffer, ::make_float2(local_m, local_l),
+                       &local_s[0], global_m[warp_iter], global_l[warp_iter],
                        &global_o[warp_iter * OutPerThread], kv_row_num, dim,
                        padded_dim);
       __syncthreads();

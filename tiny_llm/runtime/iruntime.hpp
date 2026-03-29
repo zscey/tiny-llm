@@ -27,6 +27,8 @@ public:
 
   virtual void execute() = 0;
 
+  virtual void set_prefill(bool state) = 0;
+
   virtual ~IRuntime() = default;
 };
 } // namespace tiny_llm

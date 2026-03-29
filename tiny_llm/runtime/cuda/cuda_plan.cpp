@@ -41,6 +41,13 @@ constexpr auto kKernelGenerator = Visitor{
       return LinearKernel{
           .in_dim = param.in_dim, .out_dim = param.out_dim, .bias = param.bias};
     },
+    [](const CausalAttentionParam &param) -> CudaKernel {
+      return CausalAttentionKernel{.head_dim = param.head_dim,
+                                   .q_head = param.q_head,
+                                   .kv_head = param.kv_head,
+                                   .bias = param.bias,
+                                   .max_len = param.max_len};
+    },
 };
 
 enum class Status : std::uint8_t {
