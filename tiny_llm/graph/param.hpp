@@ -52,16 +52,18 @@ public:
   bool bias{false};
 };
 
-// class AttentionParam {
-// public:
-//   uint32_t head_dim{};
-//   uint32_t q_head{};
-//   uint32_t kv_head{};
-//   bool bias{false};
-// };
+class CausalAttentionParam {
+public:
+  uint32_t head_dim{};
+  uint32_t q_head{};
+  uint32_t kv_head{};
+  bool bias{false};
+  uint32_t max_len{};
+};
 
-using Param = std::variant<SiLUParam, EmbeddingParam, RopeParam, RMSNormParam,
-                           AddParam, MulParam, LinearParam>;
+using Param =
+    std::variant<SiLUParam, EmbeddingParam, RopeParam, RMSNormParam, AddParam,
+                 MulParam, LinearParam, CausalAttentionParam>;
 
 namespace details {
 template <typename T> constexpr auto extern_input_num_impl() -> uint32_t {
@@ -76,10 +78,11 @@ template <> constexpr auto extern_input_num_impl<AddParam>() -> uint32_t {
 template <> constexpr auto extern_input_num_impl<MulParam>() -> uint32_t {
   return 2;
 }
-// template <> constexpr auto extern_input_num_impl<AttentionParam>() ->
-// uint32_t {
-//   return 4;
-// }
+template <>
+constexpr auto extern_input_num_impl<CausalAttentionParam>() -> uint32_t {
+  // hidden_state, cos, sin, pos_ids
+  return 4;
+}
 
 template <typename T> constexpr auto output_num_impl() -> uint32_t { return 1; }
 template <> constexpr auto output_num_impl<RopeParam>() -> uint32_t {

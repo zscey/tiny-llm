@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <numeric>
 #include <tuple>
+#include <variant>
 
 namespace tiny_llm::cuda {
 namespace {
@@ -65,6 +66,8 @@ struct SizeCalculator {
   GreedyMemoryPlaner gmp;
   const CudaPlan *cur_plan{};
   std::vector<Relation> relations;
+  std::unordered_map<const CausalAttentionKernel *, std::vector<size_t>>
+      attn_offsets;
   std::vector<size_t> offsets;
   std::unordered_map<const void *, uint32_t> desc_ptr_to_id;
 
@@ -211,6 +214,37 @@ struct SizeCalculator {
     }
     set_v_block(nullptr, cur_task.output_descs.at(0));
   }
+
+  void operator()(const CausalAttentionKernel &kernel) {
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    assign_initializer(cur_task.input_descs.at(4));
+    assign_initializer(cur_task.input_descs.at(5));
+    assign_initializer(cur_task.input_descs.at(6));
+    assign_initializer(cur_task.input_descs.at(7));
+    if (kernel.bias) {
+      assign_initializer(cur_task.input_descs.at(8));
+      assign_initializer(cur_task.input_descs.at(9));
+      assign_initializer(cur_task.input_descs.at(10));
+      assign_initializer(cur_task.input_descs.at(11));
+    }
+    set_v_block(nullptr, cur_task.output_descs.at(0));
+
+    auto &inner_offsets = attn_offsets[&kernel];
+    const auto &hidden_state_desc = cur_task.input_descs.at(0);
+    auto q_o_size = element_num(hidden_state_desc->max_shape) *
+                    type_size(hidden_state_desc->dtype);
+    auto k_v_size = q_o_size / kernel.q_head * kernel.kv_head;
+    auto q_block = gmp.allocate(q_o_size, kAlign);
+    inner_offsets.emplace_back(q_block.offset);
+    auto k_block = gmp.allocate(k_v_size, kAlign);
+    inner_offsets.emplace_back(k_block.offset);
+    auto v_block = gmp.allocate(k_v_size, kAlign);
+    inner_offsets.emplace_back(v_block.offset);
+    auto o_block = gmp.allocate(q_o_size, kAlign);
+    inner_offsets.emplace_back(o_block.offset);
+    gmp.deallocate(q_block);
+    gmp.deallocate(o_block);
+  }
 };
 
 struct WeightAssigner {
@@ -269,6 +303,31 @@ struct WeightAssigner {
                             {kernel.out_dim});
     }
   }
+
+  void operator()(const CausalAttentionKernel &kernel) const {
+    auto q_dim = kernel.head_dim * kernel.q_head;
+    auto kv_dim = kernel.head_dim * kernel.kv_head;
+
+    const auto &cur_task = cur_plan->tasks.at(cur_task_id);
+    check_and_copy_weight(cur_task.input_descs.at(4), cur_task.inputs.at(4),
+                          {q_dim, q_dim});
+    check_and_copy_weight(cur_task.input_descs.at(5), cur_task.inputs.at(5),
+                          {kv_dim, q_dim});
+    check_and_copy_weight(cur_task.input_descs.at(6), cur_task.inputs.at(6),
+                          {kv_dim, q_dim});
+    check_and_copy_weight(cur_task.input_descs.at(7), cur_task.inputs.at(7),
+                          {q_dim, q_dim});
+    if (kernel.bias) {
+      check_and_copy_weight(cur_task.input_descs.at(8), cur_task.inputs.at(8),
+                            {q_dim});
+      check_and_copy_weight(cur_task.input_descs.at(9), cur_task.inputs.at(9),
+                            {kv_dim});
+      check_and_copy_weight(cur_task.input_descs.at(10), cur_task.inputs.at(10),
+                            {kv_dim});
+      check_and_copy_weight(cur_task.input_descs.at(11), cur_task.inputs.at(11),
+                            {q_dim});
+    }
+  }
 };
 } // namespace
 
@@ -302,6 +361,15 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
           base_ptr +
           size_calculator.offsets.at(
               size_calculator.desc_ptr_to_id.at(task.output_descs.at(i)));
+    }
+
+    if (std::holds_alternative<CausalAttentionKernel>(task.kernel)) {
+      auto &cur_kernel = std::get<CausalAttentionKernel>(task.kernel);
+      const auto &offsets = size_calculator.attn_offsets.at(&cur_kernel);
+      cur_kernel.q_cache = reinterpret_cast<float *>(base_ptr + offsets.at(0));
+      cur_kernel.k_cache = reinterpret_cast<float *>(base_ptr + offsets.at(1));
+      cur_kernel.v_cache = reinterpret_cast<float *>(base_ptr + offsets.at(2));
+      cur_kernel.o_cache = reinterpret_cast<float *>(base_ptr + offsets.at(3));
     }
   }
 
@@ -416,6 +484,14 @@ void CudaRuntime::execute() {
           kernel.execute(task.inputs.data(), task.outputs.data());
         },
         task.kernel);
+  }
+}
+
+void CudaRuntime::set_prefill(bool state) {
+  for (auto &task : plan_.tasks) {
+    if (std::holds_alternative<CausalAttentionKernel>(task.kernel)) {
+      std::get<CausalAttentionKernel>(task.kernel).is_prefill = state;
+    }
   }
 }
 } // namespace tiny_llm::cuda

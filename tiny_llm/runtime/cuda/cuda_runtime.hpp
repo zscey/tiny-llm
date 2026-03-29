@@ -32,6 +32,8 @@ public:
 
   void execute() override;
 
+  void set_prefill(bool state) override;
+
 private:
   CudaPlan plan_;
   Buffer buffer_;
