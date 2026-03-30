@@ -1,5 +1,6 @@
 #include "tests/utils/weight_manager.hpp"
 #include "tiny_llm/runtime/cuda/cuda_runtime.hpp"
+#include "tiny_llm/utils/runfile.hpp"
 #include "tiny_llm/weight_managers/safetensors/weight_manager.hpp"
 #include "gtest/gtest.h"
 #include <cstdint>
@@ -195,8 +196,8 @@ TEST(Runtime, Attention) {
     EXPECT_TRUE(cuda_runtime.output_names() == std::vector<std::string>{"out"});
 
     {
-      SafeTensorWeightManager swm("/home/haol/code-dir/attention-test/"
-                                  "llama_attn_res_b1q5h2048.safetensors");
+      SafeTensorWeightManager swm(utils::BazelRunfile::RLocation(
+          "tiny_llm/tests/datas/llama_attn_res_b1q5h2048.safetensors"));
       auto cos_view = swm.get_tensor("cos");
       Tensor cos({.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32,
                  {5, 32}, {}, 0,
@@ -244,31 +245,25 @@ TEST(Runtime, Attention) {
           const auto *target_ptr =
               reinterpret_cast<const float *>(swm.get_tensor("res").data);
           for (uint32_t j = 0, j_end = 6144; j < j_end; ++j) {
-            EXPECT_TRUE(std::abs(out_ptr[j] - target_ptr[j]) < 1e-2F);
+            EXPECT_TRUE(std::abs(out_ptr[j] - target_ptr[j]) < 1e-5F);
           }
         }
       }
       cuda_runtime.set_prefill(false);
       {
         Tensor hidden_state({.type = DeviceType::kCpu, .id = 0},
-                            DataType::kFloat32, {1, 2, 2048}, true);
+                            DataType::kFloat32, {1, 1, 2048}, true);
         {
           auto *hidden_state_ptr = hidden_state.data<float>();
-          for (size_t i = 0, i_end = static_cast<size_t>(2) * 2048; i < i_end;
-               ++i) {
+          for (size_t i = 0; i < 2048; ++i) {
             hidden_state_ptr[i] =
                 static_cast<float>((i + static_cast<size_t>(3) * 2048) % 100) /
                 10000.F;
           }
         }
         Tensor pos_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
-                       {1, 2}, true);
-        {
-          auto *pos_ids_ptr = pos_ids.data<uint32_t>();
-          for (uint32_t i = 0; i < 2; ++i) {
-            pos_ids_ptr[i] = 3 + i;
-          }
-        }
+                       {1, 1}, true);
+        *pos_ids.data<uint32_t>() = 3;
 
         cuda_runtime.cpu_tensor_copy_to_input("hidden_state", hidden_state);
         cuda_runtime.cpu_tensor_copy_to_input("pos_ids", pos_ids);
@@ -276,14 +271,46 @@ TEST(Runtime, Attention) {
 
         Tensor out({.type = DeviceType::kCpu}, DataType::kFloat32, {2}, true);
         cuda_runtime.output_copy_to_cpu_tensor("out", out);
-        EXPECT_EQ(out.shape(), (std::vector<int64_t>{1, 2, 2048}));
+        EXPECT_EQ(out.shape(), (std::vector<int64_t>{1, 1, 2048}));
         {
           const auto *out_ptr = out.data<float>();
           const auto *target_ptr =
               reinterpret_cast<const float *>(swm.get_tensor("res").data) +
               (static_cast<size_t>(3) * 2048);
-          for (uint32_t j = 0, j_end = 4096; j < j_end; ++j) {
-            EXPECT_TRUE(std::abs(out_ptr[j] - target_ptr[j]) < 1e-2F);
+          for (uint32_t j = 0; j < 2048; ++j) {
+            EXPECT_TRUE(std::abs(out_ptr[j] - target_ptr[j]) < 1e-5F);
+          }
+        }
+      }
+      {
+        Tensor hidden_state({.type = DeviceType::kCpu, .id = 0},
+                            DataType::kFloat32, {1, 1, 2048}, true);
+        {
+          auto *hidden_state_ptr = hidden_state.data<float>();
+          for (size_t i = 0; i < 2048; ++i) {
+            hidden_state_ptr[i] =
+                static_cast<float>((i + static_cast<size_t>(4) * 2048) % 100) /
+                10000.F;
+          }
+        }
+        Tensor pos_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
+                       {1, 1}, true);
+        *pos_ids.data<uint32_t>() = 4;
+
+        cuda_runtime.cpu_tensor_copy_to_input("hidden_state", hidden_state);
+        cuda_runtime.cpu_tensor_copy_to_input("pos_ids", pos_ids);
+        cuda_runtime.execute();
+
+        Tensor out({.type = DeviceType::kCpu}, DataType::kFloat32, {2}, true);
+        cuda_runtime.output_copy_to_cpu_tensor("out", out);
+        EXPECT_EQ(out.shape(), (std::vector<int64_t>{1, 1, 2048}));
+        {
+          const auto *out_ptr = out.data<float>();
+          const auto *target_ptr =
+              reinterpret_cast<const float *>(swm.get_tensor("res").data) +
+              (static_cast<size_t>(4) * 2048);
+          for (uint32_t j = 0; j < 2048; ++j) {
+            EXPECT_TRUE(std::abs(out_ptr[j] - target_ptr[j]) < 1e-5F);
           }
         }
       }

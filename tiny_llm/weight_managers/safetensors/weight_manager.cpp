@@ -85,8 +85,12 @@ SafeTensorWeightManager::get_tensor(const std::string &name) const
   }
 
   auto raw = safetensor_get_tensor(ctx_, name.c_str());
-  TINY_LLM_CHECK(raw.data != nullptr);
-  TINY_LLM_CHECK(raw.data_len > 0);
+  if (raw.data == nullptr || raw.data_len == 0) {
+    TINY_LLM_THROW_ERROR(
+        std::runtime_error,
+        "Tensor ({}) cannot be found in the current SafeTensorWeightManager.",
+        name);
+  }
   return to_slice_view(raw);
 }
 

@@ -121,7 +121,7 @@ public:
   uint32_t seq_len{};
   uint32_t hidden_size{};
 
-  bool is_prefill{};
+  bool is_prefill{true};
   mutable uint32_t cache_length{};
   float *q_cache{};
   float *k_cache{};
