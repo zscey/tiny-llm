@@ -231,6 +231,9 @@ void CausalAttentionKernel::dtype_shape_infer(
   // attention kernel with mask is not implemented, thus the batch must be 1.
   TINY_LLM_CHECK(batch == 1);
   seq_len = h_desc->cur_shape.at(1);
+  if (!is_prefill) {
+    TINY_LLM_CHECK(seq_len == 1);
+  }
   hidden_size = h_desc->cur_shape.at(2);
 }
 
@@ -265,9 +268,10 @@ void CausalAttentionKernel::execute(const void *const *inputs,
   cuda::gemm_row_major_lt(hidden_state, v_weight, v_bias, v_cache, batch,
                           seq_len, hidden_size, kv_head, head_dim, cache_length,
                           max_len);
+  auto attn_type =
+      is_prefill ? AttentionType::kCausalMask : AttentionType::kNoMask;
   cuda::flash_attn(q_cache, k_cache, v_cache, o_cache, batch, q_head, kv_head,
-                   seq_len, new_cache_length, head_dim, max_len,
-                   AttentionType::kCausalMask);
+                   seq_len, new_cache_length, head_dim, max_len, attn_type);
   cuda::gemm_row_major_tl(o_cache, o_weight, o_bias,
                           static_cast<float *>(outputs[0]), batch, q_head,
                           seq_len, head_dim, hidden_size);

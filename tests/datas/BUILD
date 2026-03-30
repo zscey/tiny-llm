@@ -10,6 +10,7 @@ filegroup(
         "gemm_b2h4q127d61od313.safetensors",
         "gemm_b2q61d255oh4od88qs3qe77.safetensors",
         "gemm_m127d255n353.safetensors",
+        "llama_attn_res_b1q5h2048.safetensors",
         "rms_norm_b2l107d241.safetensors",
         "rope_s2_d96.safetensors",
         "test.safetensors",
