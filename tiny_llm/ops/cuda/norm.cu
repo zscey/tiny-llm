@@ -76,12 +76,16 @@ void rms_norm(const float *input, const float *weight, float *dst,
     CALL_KERNEL(2);
     return;
   }
-  if (dim <= 128) {
-    CALL_KERNEL(4);
-    return;
-  }
   if (dim <= 256) {
     CALL_KERNEL(8);
+    return;
+  }
+  if (dim <= 1024) {
+    CALL_KERNEL(32);
+    return;
+  }
+  if (dim <= 2048) {
+    CALL_KERNEL(64);
     return;
   }
 

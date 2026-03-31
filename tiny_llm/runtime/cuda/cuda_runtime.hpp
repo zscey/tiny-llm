@@ -36,7 +36,8 @@ public:
 
 private:
   CudaPlan plan_;
-  Buffer buffer_;
+  Buffer dynamic_buffer_;
+  Buffer static_buffer_;
 
   std::unordered_map<std::string, void *> input_ptrs_;
   CudaContext ctx_;
