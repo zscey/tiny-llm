@@ -11,6 +11,7 @@ auto llama_add_node(
         extern_inputs) // NOLINT(performance-unnecessary-value-param)
     -> std::array<std::string, output_num<T>()> {
   TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<T>());
+  TINY_LLM_CHECK(output_num<T>() == 1);
   std::array<std::string, output_num<T>()> output_names{node_name + ".out"};
 
   g.add_node(node_name,
@@ -25,6 +26,7 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     std::vector<std::string> extern_inputs)
     -> std::array<std::string, output_num<EmbeddingParam>()> {
   TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<EmbeddingParam>());
+  TINY_LLM_CHECK(output_num<EmbeddingParam>() == 1);
   std::array<std::string, output_num<EmbeddingParam>()> output_names{node_name +
                                                                      ".out"};
 
@@ -44,6 +46,7 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     const std::vector<std::string> &extern_inputs)
     -> std::array<std::string, output_num<RopeParam>()> {
   TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<RopeParam>());
+  TINY_LLM_CHECK(output_num<RopeParam>() == 2);
   std::array<std::string, output_num<RopeParam>()> output_names{
       node_name + ".cos", node_name + ".sin"};
 
@@ -58,6 +61,7 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     std::vector<std::string> extern_inputs)
     -> std::array<std::string, output_num<RMSNormParam>()> {
   TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<RMSNormParam>());
+  TINY_LLM_CHECK(output_num<RMSNormParam>() == 1);
   std::array<std::string, output_num<RMSNormParam>()> output_names{node_name +
                                                                    ".out"};
 
@@ -77,6 +81,7 @@ auto llama_add_node(Graph &g, const std::string &node_name,
     -> std::array<std::string, output_num<LinearParam>()> {
   TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<LinearParam>());
   TINY_LLM_CHECK(param.bias == false);
+  TINY_LLM_CHECK(output_num<LinearParam>() == 1);
   std::array<std::string, output_num<LinearParam>()> output_names{node_name +
                                                                   ".out"};
 
@@ -99,6 +104,7 @@ auto llama_add_node(Graph &g, const std::string &node_name,
   TINY_LLM_CHECK(extern_inputs.size() ==
                  extern_input_num<CausalAttentionParam>());
   TINY_LLM_CHECK(param.bias == false);
+  TINY_LLM_CHECK(output_num<CausalAttentionParam>() == 1);
   std::array<std::string, output_num<CausalAttentionParam>()> output_names{
       node_name + ".out"};
 

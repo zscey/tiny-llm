@@ -15,6 +15,7 @@ cc_test(
         "runtime/*",
         "tokenizers/*",
         "utils/*",
+        "parser/*",
     ]) + select({
         "//platforms/device:cuda": glob([
             "device_managers/cuda/*",
@@ -32,6 +33,7 @@ cc_test(
         "//tiny_llm/common:log_and_excepts",
         "//tiny_llm/device_managers/cpu:cpu_allocator",
         "//tiny_llm/graph:graph_optimizer",
+        "//tiny_llm/parser:llama_parser",
         "//tiny_llm/runtime:greedy_memory_planer",
         "//tiny_llm/tensor",
         "//tiny_llm/tokenizers/huggingface:tokenizers",
