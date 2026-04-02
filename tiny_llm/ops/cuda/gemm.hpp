@@ -54,4 +54,23 @@ void gemm_row_major_lt(const float *input, const float *weight,
 void gemm_row_major_tl(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t h,
                        uint32_t q, uint32_t d, uint32_t out_d);
+
+/**
+ * @brief
+ *
+ * @param input [b, q_end, d], use its slice [b, q_start: q_start + q, d] as the
+ * actual input
+ * @param weight [n, d], continuous
+ * @param bias [n] or empty, continuous
+ * @param dst [b, q, n], continuous
+ * @param b
+ * @param q
+ * @param d
+ * @param n
+ * @param q_start
+ * @param q_end
+ */
+void gemm_row_major_l(const float *input, const float *weight,
+                      const float *bias, float *dst, uint32_t b, uint32_t q,
+                      uint32_t d, uint32_t n, uint32_t q_start, uint32_t q_end);
 } // namespace tiny_llm::cuda

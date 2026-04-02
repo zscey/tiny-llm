@@ -48,6 +48,12 @@ constexpr auto kKernelGenerator = Visitor{
                                    .bias = param.bias,
                                    .max_len = param.max_len};
     },
+    [](const SliceLinearParam &param) -> CudaKernel {
+      return SliceLinearKernel{.in_dim = param.in_dim,
+                               .out_dim = param.out_dim,
+                               .bias = param.bias,
+                               .only_last_q = param.only_last_q};
+    },
 };
 
 enum class Status : std::uint8_t {

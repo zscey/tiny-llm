@@ -135,7 +135,23 @@ public:
   void execute(const void *const *inputs, void *const *outputs) const;
 };
 
+class SliceLinearKernel {
+public:
+  uint32_t in_dim{};
+  uint32_t out_dim{};
+  bool bias{};
+  uint32_t only_last_q{};
+
+  uint32_t batch{};
+  uint32_t q_end{};
+  /// @brief {input, weight, [bias]} -{output}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs);
+  void execute(const void *const *inputs, void *const *outputs) const;
+};
+
 using CudaKernel =
     std::variant<SiLUKernel, EmbeddingKernel, RopeKernel, RMSNormKernel,
-                 AddKernel, MulKernel, LinearKernel, CausalAttentionKernel>;
+                 AddKernel, MulKernel, LinearKernel, CausalAttentionKernel,
+                 SliceLinearKernel>;
 } // namespace tiny_llm::cuda

@@ -61,9 +61,18 @@ public:
   uint32_t max_len{};
 };
 
+// [b, q - only_last_q:, in] -> [b, only_last_q, out]
+class SliceLinearParam {
+public:
+  uint32_t in_dim{};
+  uint32_t out_dim{};
+  bool bias{false};
+  uint32_t only_last_q{};
+};
+
 using Param =
     std::variant<SiLUParam, EmbeddingParam, RopeParam, RMSNormParam, AddParam,
-                 MulParam, LinearParam, CausalAttentionParam>;
+                 MulParam, LinearParam, CausalAttentionParam, SliceLinearParam>;
 
 namespace details {
 template <typename T> constexpr auto extern_input_num_impl() -> uint32_t {

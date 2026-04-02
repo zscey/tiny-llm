@@ -14,6 +14,9 @@ constexpr auto kInputVisitor = Visitor{
     [](const CausalAttentionParam &param) -> uint32_t {
       return param.bias ? 12 : 8;
     },
+    [](const SliceLinearParam &param) -> uint32_t {
+      return param.bias ? 3 : 2;
+    },
 };
 
 constexpr auto kInplaceVisitor = Visitor{
@@ -51,6 +54,7 @@ constexpr auto kInplaceVisitor = Visitor{
     },
     [](const LinearParam &) -> std::vector<uint32_t> { return {}; },
     [](const CausalAttentionParam &) -> std::vector<uint32_t> { return {}; },
+    [](const SliceLinearParam &) -> std::vector<uint32_t> { return {}; },
 };
 } // namespace
 

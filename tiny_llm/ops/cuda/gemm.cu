@@ -73,7 +73,6 @@ __global__ void gemm_row_major_no_bias_kernel(const float *input,
   }
 
   auto block_num = CalBlockNum(d, kBlockSize);
-  // previous blocks
   for (uint32_t i = 0; i < block_num; ++i) {
     fetch_input(input, &input_buffer[0][0], i, m, d);
     fetch_weight(weight, &weight_buffer[0][0], i, n, d);
@@ -137,7 +136,6 @@ gemm_row_major_lt_no_bias_kernel(const float *input, const float *weight,
   }
 
   auto block_num = CalBlockNum(d, kBlockSize);
-  // previous blocks
   for (uint32_t i = 0; i < block_num; ++i) {
     fetch_input(input, &input_buffer[0][0], i, (b * q), d);
     fetch_weight(weight, &weight_buffer[0][0], i, (out_head * out_d), d);
@@ -201,7 +199,6 @@ __global__ void gemm_row_major_tl_no_bias_kernel(const float *input,
   }
 
   auto block_num = CalBlockNum(h * d, kBlockSize);
-  // previous blocks
   for (uint32_t i = 0; i < block_num; ++i) {
     fetch_input_tl(input, &input_buffer[0][0], i, b, h, q, d);
     fetch_weight(weight, &weight_buffer[0][0], i, out_d, h * d);
@@ -225,6 +222,66 @@ __global__ void gemm_row_major_tl_no_bias_kernel(const float *input,
   }
 
   write_dst(&res[0][0], dst, b * q, out_d);
+}
+
+__device__ void fetch_input_l(const float *input, float *input_buffer,
+                              uint32_t col_block_idx, uint32_t b, uint32_t q,
+                              uint32_t d, uint32_t q_start, uint32_t q_end) {
+  auto buffer_col = (col_block_idx * kBlockSize) + threadIdx.x;
+  for (uint32_t ty = 0; ty < kTileY; ++ty) {
+    auto *buffer_data =
+        input_buffer + ((threadIdx.y * ((kBlockSize * kTileY) + 1)) +
+                        (ty * kBlockSize) + threadIdx.x);
+    *buffer_data = 0.F;
+    auto input_row =
+        (blockIdx.y * kBlockSize * kTileY) + (ty * kBlockSize) + threadIdx.y;
+    auto cur_b = input_row / q;
+    auto cur_q = q_start + (input_row % q);
+    if (cur_b < b && cur_q < q_end && buffer_col < d) {
+      *buffer_data = input[(((cur_b * q_end) + cur_q) * d) + buffer_col];
+    }
+  }
+}
+
+__global__ void
+gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
+                                float *dst, uint32_t b, uint32_t q, uint32_t d,
+                                uint32_t n, uint32_t q_start, uint32_t q_end) {
+  __shared__ float input_buffer[kBlockSize][(kBlockSize * kTileY) + 1];
+  __shared__ float weight_buffer[kBlockSize][(kBlockSize * kTileX) + 1];
+  float res[kTileY][kTileX];
+  float input_regs[kTileY];
+  float weight_regs[kTileX];
+  for (auto &re : res) {
+    for (float &r : re) {
+      r = 0.F;
+    }
+  }
+
+  auto block_num = CalBlockNum(d, kBlockSize);
+  for (uint32_t i = 0; i < block_num; ++i) {
+    fetch_input_l(input, &input_buffer[0][0], i, b, q, d, q_start, q_end);
+    fetch_weight(weight, &weight_buffer[0][0], i, n, d);
+    __syncthreads();
+
+    for (uint32_t k = 0; k < kBlockSize; ++k) {
+      for (uint32_t ty = 0; ty < kTileY; ++ty) {
+        input_regs[ty] = input_buffer[threadIdx.y][(ty * kBlockSize) + k];
+      }
+      for (uint32_t tx = 0; tx < kTileX; ++tx) {
+        weight_regs[tx] = weight_buffer[threadIdx.x][(tx * kBlockSize) + k];
+      }
+
+      for (uint32_t ty = 0; ty < kTileY; ++ty) {
+        for (uint32_t tx = 0; tx < kTileX; ++tx) {
+          res[ty][tx] += input_regs[ty] * weight_regs[tx];
+        }
+      }
+    }
+    __syncthreads();
+  }
+
+  write_dst(&res[0][0], dst, b * q, n);
 }
 } // namespace
 
@@ -274,6 +331,24 @@ void gemm_row_major_tl(const float *input, const float *weight,
       dim3{kBlockSize, kBlockSize}, 0,
       ThreadCudaContexts::GetContext().stream>>>(input, weight, dst, b, h, q, d,
                                                  out_d);
+}
+
+void gemm_row_major_l(const float *input, const float *weight,
+                      const float *bias, float *dst, uint32_t b, uint32_t q,
+                      uint32_t d, uint32_t n, uint32_t q_start,
+                      uint32_t q_end) {
+  TINY_LLM_CHECK(bias == nullptr);
+  TINY_LLM_CHECK(q_start + q <= q_end);
+  if (b * q * d * n == 0) {
+    return;
+  }
+
+  gemm_row_major_l_no_bias_kernel<<<dim3{CalBlockNum(n, kBlockSize * kTileX),
+                                         CalBlockNum((b * q),
+                                                     kBlockSize * kTileY)},
+                                    dim3{kBlockSize, kBlockSize}, 0,
+                                    ThreadCudaContexts::GetContext().stream>>>(
+      input, weight, dst, b, q, d, n, q_start, q_end);
 }
 // NOLINTEND(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)
 } // namespace tiny_llm::cuda

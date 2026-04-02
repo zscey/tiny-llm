@@ -277,4 +277,35 @@ void CausalAttentionKernel::execute(const void *const *inputs,
                           seq_len, head_dim, hidden_size);
   cache_length = new_cache_length;
 }
+
+void SliceLinearKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
+                                          TensorDesc *const *output_descs) {
+  const auto *input_desc = input_descs[0];
+  TINY_LLM_CHECK(input_desc->cur_shape.size() == 3);
+  check_desc_dtype_and_shape(*input_desc, DataType::kFloat32, in_dim);
+  const auto *weight_desc = input_descs[1];
+  check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
+                             {out_dim, in_dim});
+  if (bias) {
+    const auto *bias_desc = input_descs[2];
+    check_desc_dtype_and_shape(*bias_desc, DataType::kFloat32,
+                               std::vector<size_t>{out_dim});
+  }
+
+  auto *output_desc = output_descs[0];
+  output_desc->dtype = input_desc->dtype;
+  batch = static_cast<uint32_t>(input_desc->cur_shape[0]);
+  q_end = static_cast<uint32_t>(input_desc->cur_shape[1]);
+  TINY_LLM_CHECK(q_end >= only_last_q);
+  output_desc->cur_shape = {batch, only_last_q, out_dim};
+}
+
+void SliceLinearKernel::execute(const void *const *inputs,
+                                void *const *outputs) const {
+  const auto *bias_ptr = bias ? static_cast<const float *>(inputs[2]) : nullptr;
+  gemm_row_major_l(static_cast<const float *>(inputs[0]),
+                   static_cast<const float *>(inputs[1]), bias_ptr,
+                   static_cast<float *>(outputs[0]), batch, only_last_q, in_dim,
+                   out_dim, q_end - only_last_q, q_end);
+}
 } // namespace tiny_llm::cuda
