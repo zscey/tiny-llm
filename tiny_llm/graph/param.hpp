@@ -61,7 +61,7 @@ public:
   uint32_t max_len{};
 };
 
-// [b, q - only_last_q:, in] -> [b, only_last_q:, out]
+// [b, q - only_last_q:, in] -> [b, only_last_q, out]
 class SliceLinearParam {
 public:
   uint32_t in_dim{};

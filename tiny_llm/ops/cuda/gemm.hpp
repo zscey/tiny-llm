@@ -62,7 +62,7 @@ void gemm_row_major_tl(const float *input, const float *weight,
  * actual input
  * @param weight [n, d], continuous
  * @param bias [n] or empty, continuous
- * @param dst [b, q, n]
+ * @param dst [b, q, n], continuous
  * @param b
  * @param q
  * @param d
