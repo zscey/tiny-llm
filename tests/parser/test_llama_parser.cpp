@@ -17,7 +17,7 @@ TEST(Parser, LlamaParser) {
   EXPECT_TRUE(input_names.contains("token_ids"));
   EXPECT_TRUE(input_names.contains("pos_ids"));
   EXPECT_TRUE(graph.output_names ==
-              std::unordered_set<std::string>{"model.norm.out"});
+              std::unordered_set<std::string>{"lm_head.out"});
 }
 
 } // namespace tiny_llm

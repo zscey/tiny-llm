@@ -141,7 +141,7 @@ TEST(CudaOps, GemmLT) {
   for (size_t i = 0,
               i_end = static_cast<size_t>(b * out_head * q_end * out_dim);
        i < i_end; ++i) {
-    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]) << i;
+    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]);
   }
 }
 
@@ -188,7 +188,57 @@ TEST(CudaOps, GemmTL) {
       reinterpret_cast<const float *>(wm.get_tensor("res").data);
   for (size_t i = 0, i_end = static_cast<size_t>(b * q * out_d); i < i_end;
        ++i) {
-    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]) << i;
+    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]);
+  }
+}
+
+TEST(CudaOps, GemmL) {
+  int64_t b = 2;
+  int64_t q_start = 10;
+  int64_t q = 40;
+  int64_t q_end = q_start + q + 20;
+  int64_t d = 255;
+  int64_t n = 353;
+  Device target_dev = {.type = DeviceType::kCuda, .id = 0};
+
+  Tensor input({.type = DeviceType::kCpu}, DataType::kFloat32, {b, q_end, d});
+  {
+    auto *input_ptr = input.data<float>();
+    size_t i{};
+    for (int64_t cur_b = 0; cur_b < b; ++cur_b) {
+      auto *cur_ptr = input_ptr + (((cur_b * q_end) + q_start) * d);
+      auto *cur_ptr_end = cur_ptr + (q * d);
+      while (cur_ptr < cur_ptr_end) {
+        *cur_ptr++ = static_cast<float>(i % 100);
+        ++i;
+      }
+    }
+    input = input.to(target_dev);
+  }
+
+  Tensor weight({.type = DeviceType::kCpu}, DataType::kFloat32, {n, d});
+  {
+    auto *weight_ptr = weight.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(n * d); i < i_end; ++i) {
+      weight_ptr[i] = static_cast<float>(i % 100);
+    }
+    weight = weight.to(target_dev);
+  }
+
+  Tensor dst(target_dev, DataType::kFloat32, {b, q, n});
+  cuda::gemm_row_major_l(input.data<float>(), weight.data<float>(), nullptr,
+                         dst.data<float>(), b, q, d, n, q_start, q_end);
+  auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+  ThreadCudaContexts::Synchronize();
+
+  SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/gemm_m127d255n353.safetensors"));
+  const auto *dst_ptr = cpu_dst.data<float>();
+  const auto *target_ptr =
+      reinterpret_cast<const float *>(wm.get_tensor("res").data);
+  for (size_t i = 0, i_end = static_cast<size_t>(b) * q * n; i < i_end; ++i) {
+    EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]);
   }
 }
 } // namespace tiny_llm

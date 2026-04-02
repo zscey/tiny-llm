@@ -20,8 +20,7 @@ TEST(Tokenizers, Huggingface) {
 
     {
       auto decode_res = wrapper.decode(encode_res, true);
-      EXPECT_TRUE(decode_res == "replace me by any text you ' d like.")
-          << decode_res;
+      EXPECT_TRUE(decode_res == "replace me by any text you ' d like.");
     }
     {
       auto decode_res = wrapper.decode(encode_res, false);
@@ -40,8 +39,7 @@ TEST(Tokenizers, Huggingface) {
 
     {
       auto decode_res = wrapper.decode(encode_res, true);
-      EXPECT_TRUE(decode_res == "replace me by any text you ' d like.")
-          << decode_res;
+      EXPECT_TRUE(decode_res == "replace me by any text you ' d like.");
     }
     {
       auto decode_res = wrapper.decode(encode_res, false);

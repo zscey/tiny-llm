@@ -235,6 +235,15 @@ struct SizeCalculator {
     dynamic_gmp.deallocate(inner_relation.at(3).v_block);
   }
 
+  void operator()(const SliceLinearKernel &kernel) {
+    const auto &cur_task = plan->tasks.at(cur_task_id);
+    assign_initializer(cur_task.input_descs.at(1));
+    if (kernel.bias) {
+      assign_initializer(cur_task.input_descs.at(2));
+    }
+    set_v_block(nullptr, cur_task.output_descs.at(0));
+  }
+
   struct BufferPtrs {
     std::byte *dynamic_ptr;
     std::byte *static_ptr;
@@ -358,6 +367,16 @@ struct WeightAssigner {
                             {kv_dim});
       check_and_copy_weight(cur_task.input_descs.at(11), cur_task.inputs.at(11),
                             {q_dim});
+    }
+  }
+
+  void operator()(const SliceLinearKernel &kernel) const {
+    const auto &cur_task = plan->tasks.at(cur_task_id);
+    check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
+                          {kernel.out_dim, kernel.in_dim});
+    if (kernel.bias) {
+      check_and_copy_weight(cur_task.input_descs.at(2), cur_task.inputs.at(2),
+                            {kernel.out_dim});
     }
   }
 };

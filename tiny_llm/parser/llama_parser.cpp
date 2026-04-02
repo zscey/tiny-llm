@@ -130,6 +130,27 @@ auto llama_add_node(Graph &g, const std::string &node_name,
              param);
   return output_names;
 }
+
+auto llama_add_node(Graph &g, const std::string &node_name,
+                    const SliceLinearParam &param,
+                    std::vector<std::string> extern_inputs)
+    -> std::array<std::string, output_num<SliceLinearParam>()> {
+  TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<SliceLinearParam>());
+  TINY_LLM_CHECK(param.bias == false);
+  TINY_LLM_CHECK(output_num<SliceLinearParam>() == 1);
+  std::array<std::string, output_num<SliceLinearParam>()> output_names{
+      node_name + ".out"};
+
+  g.add_tensor(node_name + ".weight", DataType::kFloat32,
+               {param.out_dim, param.in_dim});
+
+  extern_inputs.emplace_back(node_name + ".weight");
+  g.add_node(node_name,
+             {.input_names = std::move(extern_inputs),
+              .output_names = {output_names.begin(), output_names.end()}},
+             param);
+  return output_names;
+}
 } // namespace
 
 auto llama_parser(const nlohmann::json &config) -> Graph {
@@ -229,9 +250,16 @@ auto llama_parser(const nlohmann::json &config) -> Graph {
                                   .eps = config["rms_norm_eps"].get<float>(),
                                   .inplace = true},
                      {last_hidden_state});
+  auto [lm_head] = llama_add_node(
+      g, "lm_head",
+      SliceLinearParam{.in_dim = hidden_size,
+                       .out_dim = config["vocab_size"].get<uint32_t>(),
+                       .bias = false,
+                       .only_last_q = 1},
+      {model_norm});
 
   g.set_input_names({input_token_name, input_pos_ids_name});
-  g.set_output_names({model_norm});
+  g.set_output_names({lm_head});
   return g;
 }
 } // namespace tiny_llm
