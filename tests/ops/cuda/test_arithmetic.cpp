@@ -40,16 +40,16 @@ TEST(CudaOps, Arithmetic) {
   c = c.to({.type = DeviceType::kCuda, .id = 0});
 
   cuda::arithmetic(a.data<float>(), a.data<float>(), a.data<float>(),
-                   element_size, cuda::ArithmeticType::kAdd);
+                   element_size, ArithmeticType::kAdd);
   check_arithmetic_res(a, 2.F);
   cuda::arithmetic(a.data<float>(), c.data<float>(), c.data<float>(),
-                   element_size, cuda::ArithmeticType::kMul);
+                   element_size, ArithmeticType::kMul);
   check_arithmetic_res(c, 200.F);
   cuda::arithmetic(b.data<float>(), a.data<float>(), b.data<float>(),
-                   element_size, cuda::ArithmeticType::kSub);
+                   element_size, ArithmeticType::kSub);
   check_arithmetic_res(b, 8.F);
   cuda::arithmetic(c.data<float>(), b.data<float>(), a.data<float>(),
-                   element_size, cuda::ArithmeticType::kDiv);
+                   element_size, ArithmeticType::kDiv);
   check_arithmetic_res(a, 25.F);
 }
 } // namespace tiny_llm
