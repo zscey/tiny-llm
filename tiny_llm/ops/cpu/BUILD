@@ -19,7 +19,7 @@ cc_library(
     srcs = ["arithmetic.cpp"],
     hdrs = ["arithmetic.hpp"],
     deps = [
-        "cpu_op_common",
+        ":cpu_op_common",
         "//tiny_llm/ops:arithmetic_type",
     ],
 )
@@ -27,5 +27,5 @@ cc_library(
 cc_library(
     name = "cpu_ops",
     visibility = ["//:__subpackages__"],
-    deps = ["arithmetic"],
+    deps = [":arithmetic"],
 )

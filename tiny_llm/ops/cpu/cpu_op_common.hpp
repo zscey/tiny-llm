@@ -36,7 +36,7 @@ auto parallel_run(F f, size_t beg, size_t end,
     std::vector<std::invoke_result_t<F, size_t, size_t>> res;
     res.reserve(futures.size());
     for (auto &fut : futures) {
-      res.push_back(fut.get());
+      res.emplace_back(fut.get());
     }
     return res;
   } else {
