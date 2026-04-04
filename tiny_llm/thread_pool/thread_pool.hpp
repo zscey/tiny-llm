@@ -96,6 +96,8 @@ public:
   ThreadPool(ThreadPool &&) = delete;
   auto operator=(ThreadPool &&) -> ThreadPool & = delete;
 
+  auto thread_num() -> size_t { return workers_.size(); }
+
 private:
   std::vector<std::unique_ptr<WorkerContext>> contexts_;
   std::atomic<size_t> next_worker_{0};

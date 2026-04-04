@@ -83,6 +83,7 @@ cuda_library(
     hdrs = ["arithmetic.hpp"],
     deps = [
         ":cuda_op_common",
+        "//tiny_llm/ops:arithmetic_type",
     ],
 )
 

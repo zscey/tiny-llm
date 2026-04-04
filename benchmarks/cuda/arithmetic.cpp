@@ -13,7 +13,7 @@ void bm_add(benchmark::State &state) {
   for (auto _ : state) {
     cuda::arithmetic(t.data<float>(), t.data<float>(), t.data<float>(),
                      static_cast<size_t>(state.range(0) * state.range(0)),
-                     cuda::ArithmeticType::kAdd);
+                     ArithmeticType::kAdd);
     ThreadCudaContexts::Synchronize();
   }
 }
