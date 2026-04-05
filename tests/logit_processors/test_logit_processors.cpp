@@ -173,7 +173,7 @@ TEST(LogitProcessors, TopP) {
     logit_ptr[0] = 0.5F;
     logit_ptr[20] = 2.F;
 
-    LogitProcessorWrapper wrapper(TopPProcessor{0.2});
+    LogitProcessorWrapper wrapper(TopPProcessor{0.2F});
     wrapper.apply(logit, id, valid_size);
     EXPECT_FLOAT_EQ(logit.data<float>()[0], 0.5F);
     EXPECT_FLOAT_EQ(logit.data<float>()[1], 19.F / 40.F);
@@ -189,6 +189,15 @@ TEST(LogitProcessors, TopP) {
     EXPECT_FLOAT_EQ(id.data<uint32_t>()[20], 0);
     EXPECT_FLOAT_EQ(id.data<uint32_t>()[21], 19);
     EXPECT_EQ(valid_size_ptr[1], 2);
+
+    {
+      valid_size_ptr[0] = 21;
+      EXPECT_ANY_THROW(wrapper.apply(logit, id, valid_size));
+      valid_size_ptr[0] = 20;
+      EXPECT_ANY_THROW(TopPProcessor{2.F});
+      LogitProcessorWrapper bad_wrapper(TopPProcessor{0.2F, 21});
+      EXPECT_ANY_THROW(bad_wrapper.apply(logit, id, valid_size));
+    }
   }
 }
 } // namespace tiny_llm

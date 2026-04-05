@@ -124,8 +124,8 @@ void TopPProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] >= min_tokens_to_keep_);
   }
 
-  for (int64_t b = 0, b_end = logit.shape().at(0); b < b_end; ++b) {
-    auto shift = b * logit.shape().at(1);
+  for (int64_t b = 0; b < batch; ++b) {
+    auto shift = b * dim;
     auto *logit_ptr = logit.data<float>() + shift;
     auto logit_size = valid_size.data<uint32_t>()[b];
     quick_sort(logit_ptr, id.data<uint32_t>() + shift, 0,
