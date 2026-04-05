@@ -18,6 +18,7 @@ cc_test(
         "parser/*",
         "thread_pool/*",
         "ops/cpu/*",
+        "logit_processors/*",
     ]) + select({
         "//platforms/device:cuda": glob([
             "device_managers/cuda/*",
@@ -35,6 +36,7 @@ cc_test(
         "//tiny_llm/common:log_and_excepts",
         "//tiny_llm/device_managers/cpu:cpu_allocator",
         "//tiny_llm/graph:graph_optimizer",
+        "//tiny_llm/logit_processors:topk_processor",
         "//tiny_llm/ops/cpu:cpu_ops",
         "//tiny_llm/parser:llama_parser",
         "//tiny_llm/runtime:greedy_memory_planer",
