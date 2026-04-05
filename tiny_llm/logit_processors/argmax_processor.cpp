@@ -38,4 +38,6 @@ void ArgmaxProcessor::apply(Tensor &logit, Tensor &id,
     valid_size.data<uint32_t>()[i] = 1;
   }
 }
+
+static_assert(LogitProcessor<ArgmaxProcessor>);
 } // namespace tiny_llm

@@ -1,13 +1,14 @@
 #include "tiny_llm/logit_processors/sample_processors.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
+#include <random>
 
 namespace tiny_llm {
-MultinomialProcessor::MultinomialProcessor()
-    : seed_(std::mt19937{std::random_device{}()}) {}
-
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void MultinomialProcessor::apply(Tensor &logit, Tensor &id,
-                                 Tensor &valid_size) {
+                                 Tensor &valid_size) const {
+  thread_local std::mt19937 engine(std::random_device{}());
+  thread_local std::uniform_real_distribution<> dist(0.F, 1.F);
+
   (void)this;
   TINY_LLM_CHECK(logit.dtype() == DataType::kFloat32);
   TINY_LLM_CHECK(id.dtype() == DataType::kUint32);
@@ -39,7 +40,7 @@ void MultinomialProcessor::apply(Tensor &logit, Tensor &id,
       exp_sum += logit_ptr[i];
     }
 
-    auto random_number = dis_(seed_);
+    auto random_number = dist(engine);
     uint32_t sampled_id{};
     for (; sampled_id < logit_size; ++sampled_id) {
       random_number -= logit_ptr[sampled_id] / exp_sum;
@@ -54,4 +55,6 @@ void MultinomialProcessor::apply(Tensor &logit, Tensor &id,
     valid_size.data<uint32_t>()[b] = 1;
   }
 }
+
+static_assert(LogitProcessor<MultinomialProcessor>);
 } // namespace tiny_llm

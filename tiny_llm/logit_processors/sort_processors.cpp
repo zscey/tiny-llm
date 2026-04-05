@@ -149,4 +149,6 @@ void TopPProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
     valid_size.data<uint32_t>()[b] = valid_idx + 1;
   }
 }
+
+static_assert(LogitProcessor<TopPProcessor>);
 } // namespace tiny_llm
