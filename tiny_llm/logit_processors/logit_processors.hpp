@@ -5,17 +5,11 @@
 #include <memory>
 
 namespace tiny_llm {
-struct LogitWithId {
-  float logit{};
-  uint32_t idx{};
-};
-
 template <typename T>
 concept LogitProcessor =
     std::move_constructible<T> &&
-    requires(T t, Tensor &tensor,
-             std::vector<std::vector<LogitWithId>> &logit_with_id) {
-      { t.apply(tensor, logit_with_id) } -> std::same_as<void>;
+    requires(T t, Tensor &logit, Tensor &id, uint32_t valid_size) {
+      { t.apply(logit, id, valid_size) } -> std::same_as<uint32_t>;
     };
 
 class LogitProcessorWrapper {
@@ -24,9 +18,8 @@ class LogitProcessorWrapper {
     TINY_LLM_DEFAULT_COPY_MOVE(Concept);
     virtual ~Concept() = default;
 
-    virtual void
-    apply(Tensor &tensor,
-          std::vector<std::vector<LogitWithId>> &logit_with_id) = 0;
+    virtual auto apply(Tensor &logit, Tensor &id, uint32_t valid_size)
+        -> uint32_t = 0;
   };
 
   template <LogitProcessor T> struct Container final : public Concept {
@@ -36,9 +29,9 @@ class LogitProcessorWrapper {
     TINY_LLM_DEFAULT_COPY_MOVE(Container)
     ~Container() override = default;
 
-    void apply(Tensor &tensor,
-               std::vector<std::vector<LogitWithId>> &logit_with_id) override {
-      logit_processor.apply(tensor, logit_with_id);
+    auto apply(Tensor &logit, Tensor &id, uint32_t valid_size)
+        -> uint32_t override {
+      return logit_processor.apply(logit, id, valid_size);
     }
   };
 
@@ -49,9 +42,8 @@ public:
   explicit LogitProcessorWrapper(T &&t)
       : wrapper_(std::make_unique<Container<T>>(std::forward<T>(t))) {}
 
-  void apply(Tensor &tensor,
-             std::vector<std::vector<LogitWithId>> &logit_with_id) {
-    wrapper_->apply(tensor, logit_with_id);
+  auto apply(Tensor &logit, Tensor &id, uint32_t valid_size) -> uint32_t {
+    return wrapper_->apply(logit, id, valid_size);
   }
 };
 } // namespace tiny_llm

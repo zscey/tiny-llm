@@ -1,68 +1,65 @@
-#include "tiny_llm/logit_processors/topk_processor.hpp"
+#include "tiny_llm/logit_processors/sort_processors.hpp"
 #include "gtest/gtest.h"
+#include <cstddef>
 #include <unordered_set>
 
 namespace tiny_llm {
 TEST(LogitProcessors, TopK) {
-  std::vector<std::vector<LogitWithId>> res;
   {
     Tensor logit({.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32,
                  {2, 20});
-    auto *ptr = logit.data<float>();
+    Tensor id({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32, {2, 20});
+    auto *logit_ptr = logit.data<float>();
+    auto *id_ptr = id.data<uint32_t>();
     for (uint32_t i = 0; i < 40; ++i) {
-      ptr[i] = static_cast<float>(i);
+      logit_ptr[i] = static_cast<float>(i);
+      id_ptr[i] = i;
     }
 
     LogitProcessorWrapper wrapper(TopKProcessor{0});
-    wrapper.apply(logit, res);
-
-    EXPECT_EQ(res.size(), 2);
-    for (const auto &elem : res) {
-      EXPECT_TRUE(elem.empty());
-    }
+    EXPECT_EQ(wrapper.apply(logit, id, 20), 0);
   }
   {
     Tensor logit({.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32,
                  {2, 20});
-    auto *ptr = logit.data<float>();
+    Tensor id({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32, {2, 20});
+    auto *logit_ptr = logit.data<float>();
+    auto *id_ptr = id.data<uint32_t>();
     for (uint32_t i = 0; i < 40; ++i) {
-      ptr[i] = static_cast<float>(i);
+      logit_ptr[i] = static_cast<float>(i);
+      id_ptr[i] = i % 20;
     }
 
     LogitProcessorWrapper wrapper(TopKProcessor{1});
-    wrapper.apply(logit, res);
+    EXPECT_EQ(wrapper.apply(logit, id, 20), 1);
 
-    EXPECT_EQ(res.size(), 2);
-    for (const auto &elem : res) {
-      EXPECT_EQ(elem.size(), 1);
-    }
-    EXPECT_EQ(res.at(0).at(0).logit, 19.F);
-    EXPECT_EQ(res.at(0).at(0).idx, 19);
-    EXPECT_EQ(res.at(1).at(0).logit, 39.F);
-    EXPECT_EQ(res.at(1).at(0).idx, 19);
+    EXPECT_EQ(*logit.data<float>(), 19.F);
+    EXPECT_EQ(*id.data<uint32_t>(), 19);
+    EXPECT_EQ(*(logit.data<float>() + 20), 39.F);
+    EXPECT_EQ(*(id.data<uint32_t>() + 20), 19);
   }
   {
     Tensor logit({.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32,
                  {2, 20});
-    auto *ptr = logit.data<float>();
+    Tensor id({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32, {2, 20});
+    auto *logit_ptr = logit.data<float>();
+    auto *id_ptr = id.data<uint32_t>();
     for (uint32_t i = 0; i < 40; ++i) {
-      ptr[i] = static_cast<float>(i);
+      logit_ptr[i] = static_cast<float>(i);
+      id_ptr[i] = i % 20;
     }
 
     LogitProcessorWrapper wrapper(TopKProcessor{5});
-    wrapper.apply(logit, res);
-
-    EXPECT_EQ(res.size(), 2);
+    EXPECT_EQ(wrapper.apply(logit, id, 20), 5);
     for (uint32_t i = 0; i < 2; ++i) {
-      const auto &cur_res = res.at(i);
-      EXPECT_EQ(cur_res.size(), 5);
+      auto *logit_ptr = logit.data<float>() + static_cast<ptrdiff_t>(i * 20);
+      auto *id_ptr = id.data<uint32_t>() + static_cast<ptrdiff_t>(i * 20);
 
       std::unordered_set<uint32_t> idxs;
       for (uint32_t j = 0; j < 5; ++j) {
-        const auto &elem = cur_res.at(j);
-        EXPECT_EQ(elem.logit, static_cast<float>(elem.idx) +
-                                  (20.F * static_cast<float>(i)));
-        idxs.emplace(elem.idx);
+        EXPECT_EQ(logit_ptr[j], static_cast<float>(id_ptr[j]) +
+                                    (20.F * static_cast<float>(i)));
+        idxs.emplace(id_ptr[j]);
       }
 
       EXPECT_TRUE(idxs.contains(17));

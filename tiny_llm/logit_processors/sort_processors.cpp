@@ -1,4 +1,4 @@
-#include "tiny_llm/logit_processors/topk_processor.hpp"
+#include "tiny_llm/logit_processors/sort_processors.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include <numeric>
 
@@ -48,41 +48,28 @@ void quick_select(float *logit, uint32_t *id, uint32_t left, uint32_t right,
     quick_select(logit, id, pivot_index + 1, right, k);
   }
 }
-
-void top_k_kernel(float *logit, uint32_t size, uint32_t k,
-                  std::vector<LogitWithId> &logit_with_id) {
-  std::vector<uint32_t> id(size);
-  std::iota(id.begin(), id.end(), 0);
-  quick_select(logit, id.data(), 0, size - 1, k);
-
-  for (uint32_t i = 0; i < k; ++i) {
-    logit_with_id.emplace_back(logit[i], id.at(i));
-  }
-}
 } // namespace
 
-void TopKProcessor::apply(
-    Tensor &tensor,
-    std::vector<std::vector<LogitWithId>> &logit_with_id) const {
-  TINY_LLM_CHECK(tensor.shape().size() == 2);
-  TINY_LLM_CHECK(tensor.shape().back() >= top_k_);
+auto TopKProcessor::apply(Tensor &logit, Tensor &id, uint32_t valid_size) const
+    -> uint32_t {
+  TINY_LLM_CHECK(logit.dtype() == DataType::kFloat32);
+  TINY_LLM_CHECK(id.dtype() == DataType::kUint32);
+  TINY_LLM_CHECK(logit.shape().size() == 2);
+  TINY_LLM_CHECK(logit.shape() == id.shape());
+  TINY_LLM_CHECK(logit.shape().back() >= valid_size);
+  TINY_LLM_CHECK(valid_size >= top_k_);
 
-  auto b = tensor.shape().at(0);
-  logit_with_id.resize(b);
-  for (auto &elem : logit_with_id) {
-    elem.clear();
-    elem.reserve(top_k_);
-  }
   if (top_k_ == 0) {
-    return;
+    return 0;
   }
 
-  auto d = tensor.shape().at(1);
-  for (int64_t cur_b = 0; cur_b < b; ++cur_b) {
-    auto *cur_ptr = tensor.data<float>() + (cur_b * d);
-    top_k_kernel(cur_ptr, static_cast<uint32_t>(d), top_k_,
-                 logit_with_id.at(cur_b));
+  for (int64_t b = 0, b_end = logit.shape().at(0); b < b_end; ++b) {
+    auto shift = b * logit.shape().at(1);
+    quick_select(logit.data<float>() + shift, id.data<uint32_t>() + shift, 0,
+                 valid_size - 1, top_k_);
   }
+
+  return top_k_;
 }
 
 static_assert(LogitProcessor<TopKProcessor>);

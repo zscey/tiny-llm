@@ -7,8 +7,7 @@ class TopKProcessor {
 public:
   explicit TopKProcessor(uint32_t top_k) : top_k_(top_k) {}
 
-  void apply(Tensor &tensor,
-             std::vector<std::vector<LogitWithId>> &logit_with_id) const;
+  auto apply(Tensor &logit, Tensor &id, uint32_t valid_size) const -> uint32_t;
 
 private:
   uint32_t top_k_{};

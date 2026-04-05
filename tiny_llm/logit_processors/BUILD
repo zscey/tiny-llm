@@ -9,9 +9,9 @@ cc_library(
 )
 
 cc_library(
-    name = "topk_processor",
-    srcs = ["topk_processor.cpp"],
-    hdrs = ["topk_processor.hpp"],
+    name = "sort_processors",
+    srcs = ["sort_processors.cpp"],
+    hdrs = ["sort_processors.hpp"],
     deps = [
         ":logit_processors",
         "//tiny_llm/common:log_and_excepts",
