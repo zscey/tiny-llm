@@ -18,6 +18,10 @@ cc_library(
     name = "arithmetic",
     srcs = ["arithmetic.cpp"],
     hdrs = ["arithmetic.hpp"],
+    copts = select({
+        "//platforms/isa:avx2": ["-mavx2"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":cpu_op_common",
         "//tiny_llm/ops:arithmetic_type",
