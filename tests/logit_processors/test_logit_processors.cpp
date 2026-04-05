@@ -13,7 +13,7 @@ TEST(LogitProcessors, TopK) {
     auto *id_ptr = id.data<uint32_t>();
     for (uint32_t i = 0; i < 40; ++i) {
       logit_ptr[i] = static_cast<float>(i);
-      id_ptr[i] = i;
+      id_ptr[i] = i % 20;
     }
 
     LogitProcessorWrapper wrapper(TopKProcessor{0});
@@ -67,6 +67,12 @@ TEST(LogitProcessors, TopK) {
       EXPECT_TRUE(idxs.contains(19));
       EXPECT_TRUE(idxs.contains(15));
       EXPECT_TRUE(idxs.contains(16));
+    }
+
+    EXPECT_ANY_THROW(wrapper.apply(logit, id, 21));
+    {
+      LogitProcessorWrapper bad_wrapper(TopKProcessor{21});
+      EXPECT_ANY_THROW(bad_wrapper.apply(logit, id, 20));
     }
   }
 }
