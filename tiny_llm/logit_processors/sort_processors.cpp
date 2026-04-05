@@ -59,7 +59,7 @@ void TopKProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
 
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
-  TINY_LLM_CHECK(valid_size.shape() == std::vector<int64_t>{logit.shape()[0]})
+  TINY_LLM_CHECK(valid_size.shape() == std::vector<int64_t>{batch})
   for (int64_t i = 0; i < batch; ++i) {
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] <= dim);
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] >= top_k_);
@@ -118,7 +118,7 @@ void TopPProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
 
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
-  TINY_LLM_CHECK(valid_size.shape() == std::vector<int64_t>{logit.shape()[0]})
+  TINY_LLM_CHECK(valid_size.shape() == std::vector<int64_t>{batch})
   for (int64_t i = 0; i < batch; ++i) {
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] <= dim);
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] >= min_tokens_to_keep_);

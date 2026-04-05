@@ -17,3 +17,23 @@ cc_library(
         "//tiny_llm/common:log_and_excepts",
     ],
 )
+
+cc_library(
+    name = "argmax_processor",
+    srcs = ["argmax_processor.cpp"],
+    hdrs = ["argmax_processor.hpp"],
+    deps = [
+        ":logit_processors",
+        "//tiny_llm/common:log_and_excepts",
+    ],
+)
+
+cc_library(
+    name = "sample_processors",
+    srcs = ["sample_processors.cpp"],
+    hdrs = ["sample_processors.hpp"],
+    deps = [
+        ":logit_processors",
+        "//tiny_llm/common:log_and_excepts",
+    ],
+)
