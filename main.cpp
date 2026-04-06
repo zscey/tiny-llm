@@ -6,6 +6,16 @@
 // NOLINTBEGIN
 DEFINE_string(model_path, "", "Path to the model directory (required)");
 DEFINE_int32(device, 0, "CUDA device ID");
+
+DEFINE_int32(max_new_tokens, 256, "Maximum number of tokens to generate");
+DEFINE_bool(do_sample, true,
+            "Whether to use sampling; if false, use greedy decoding");
+DEFINE_double(temperature, 0.7,
+              "Sampling temperature (higher = more creative)");
+DEFINE_int32(top_k, 50, "Sample from the top K most likely tokens");
+DEFINE_double(top_p, 0.95,
+              "Sample from the smallest set of tokens whose cumulative "
+              "probability > p (within the range [0, 1])");
 // NOLINTEND
 
 auto main(int argc, char **argv) -> int32_t {
@@ -56,10 +66,11 @@ auto main(int argc, char **argv) -> int32_t {
         continue;
       }
 
-      auto result = pipeline.apply({input_buffer});
-      std::cout << "[Output Begin]\n"
-                << result.at(0).substr(input_buffer.size())
-                << "\n[Output End]\n";
+      auto result = pipeline.apply(
+          {input_buffer}, static_cast<uint32_t>(FLAGS_max_new_tokens),
+          FLAGS_do_sample, static_cast<float>(FLAGS_temperature),
+          static_cast<uint32_t>(FLAGS_top_k), static_cast<float>(FLAGS_top_p));
+      std::cout << "[Output Begin] >\n" << result.at(0) << "\n[Output End]\n";
     }
   } catch (const std::exception &e) {
     std::cerr << "[Fatal]: " << e.what() << "\n";
