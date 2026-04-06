@@ -43,5 +43,6 @@ cc_library(
     hdrs = ["temperature_processor.hpp"],
     deps = [
         ":logit_processors",
+        "//tiny_llm/ops/cpu:cpu_ops",
     ],
 )

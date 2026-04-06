@@ -21,4 +21,6 @@ public:
 private:
   float temperature_{};
 };
+
+static_assert(LogitProcessor<TemperatureProcessor>);
 } // namespace tiny_llm
