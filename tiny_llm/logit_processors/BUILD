@@ -5,7 +5,10 @@ package(default_visibility = ["//:__subpackages__"])
 cc_library(
     name = "logit_processors",
     hdrs = ["logit_processors.hpp"],
-    deps = ["//tiny_llm/tensor"],
+    deps = [
+        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/tensor",
+    ],
 )
 
 cc_library(
@@ -14,7 +17,6 @@ cc_library(
     hdrs = ["sort_processors.hpp"],
     deps = [
         ":logit_processors",
-        "//tiny_llm/common:log_and_excepts",
     ],
 )
 
@@ -24,7 +26,6 @@ cc_library(
     hdrs = ["argmax_processor.hpp"],
     deps = [
         ":logit_processors",
-        "//tiny_llm/common:log_and_excepts",
     ],
 )
 
@@ -34,6 +35,13 @@ cc_library(
     hdrs = ["sample_processors.hpp"],
     deps = [
         ":logit_processors",
-        "//tiny_llm/common:log_and_excepts",
+    ],
+)
+
+cc_library(
+    name = "temperature_processor",
+    hdrs = ["temperature_processor.hpp"],
+    deps = [
+        ":logit_processors",
     ],
 )

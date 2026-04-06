@@ -251,4 +251,12 @@ auto Tensor::to(Device device) const -> Tensor {
   copy_to(res);
   return res;
 }
+
+void Tensor::reshape(std::vector<int64_t> shape) {
+  TINY_LLM_CHECK(is_continuous());
+  TINY_LLM_CHECK(element_size(shape) == element_size(shape_));
+
+  shape_ = std::move(shape);
+  stride_ = shape_to_stride(shape_, dtype_);
+}
 } // namespace tiny_llm
