@@ -143,5 +143,19 @@ TYPED_TEST(TensorBaseTest, TensorBaseApi) {
 
   ThreadCudaContexts::Synchronize();
 #endif
+
+  { // reshape
+    auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
+    cur_tensor.reshape({static_cast<int64_t>(3) * 4 * 7 * 5});
+    EXPECT_EQ(cur_tensor.shape(),
+              std::vector<int64_t>{static_cast<int64_t>(3) * 4 * 7 * 5});
+    EXPECT_EQ(cur_tensor.stride(), std::vector<int64_t>{size});
+
+    cur_tensor.reshape({12, 35});
+    EXPECT_EQ(cur_tensor.shape(), (std::vector<int64_t>{12, 35}));
+    EXPECT_EQ(cur_tensor.stride(), (std::vector<int64_t>{size * 35, size}));
+
+    EXPECT_ANY_THROW(cur_tensor.reshape({12, 36}));
+  }
 }
 } // namespace tiny_llm

@@ -61,6 +61,8 @@ public:
   // May async
   [[nodiscard]] auto to(Device device) const -> Tensor;
 
+  void reshape(std::vector<int64_t> shape);
+
 private:
   Device device_{};
   DataType dtype_{};

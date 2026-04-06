@@ -51,15 +51,10 @@ void quick_select(float *logit, uint32_t *id, int32_t left, int32_t right,
 } // namespace
 
 void TopKProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
-  TINY_LLM_CHECK(logit.dtype() == DataType::kFloat32);
-  TINY_LLM_CHECK(id.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(valid_size.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(logit.shape().size() == 2);
-  TINY_LLM_CHECK(logit.shape() == id.shape());
+  check_params(logit, id, valid_size);
 
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
-  TINY_LLM_CHECK(valid_size.shape() == std::vector<int64_t>{batch})
   for (int64_t i = 0; i < batch; ++i) {
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] <= dim);
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] >= top_k_);
@@ -110,15 +105,10 @@ void quick_sort(float *logit, uint32_t *id, int32_t left, int32_t right) {
 } // namespace
 
 void TopPProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
-  TINY_LLM_CHECK(logit.dtype() == DataType::kFloat32);
-  TINY_LLM_CHECK(id.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(valid_size.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(logit.shape().size() == 2);
-  TINY_LLM_CHECK(logit.shape() == id.shape());
+  check_params(logit, id, valid_size);
 
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
-  TINY_LLM_CHECK(valid_size.shape() == std::vector<int64_t>{batch})
   for (int64_t i = 0; i < batch; ++i) {
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] <= dim);
     TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] >= min_tokens_to_keep_);

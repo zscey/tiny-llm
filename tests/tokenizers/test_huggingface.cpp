@@ -27,6 +27,20 @@ TEST(Tokenizers, Huggingface) {
       EXPECT_TRUE(decode_res ==
                   "[CLS] replace me by any text you ' d like. [SEP]");
     }
+    {
+      encode_res.emplace_back(0);
+      encode_res.emplace_back(0);
+      {
+        auto decode_res = wrapper.decode(encode_res, true);
+        EXPECT_TRUE(decode_res == "replace me by any text you ' d like.");
+      }
+      {
+        auto decode_res = wrapper.decode(encode_res, false);
+        EXPECT_EQ(
+            decode_res,
+            "[CLS] replace me by any text you ' d like. [SEP] [PAD] [PAD]");
+      }
+    }
   }
   {
     auto encode_res = wrapper.encode(text, false);
