@@ -11,11 +11,6 @@ void MultinomialProcessor::apply(Tensor &logit, Tensor &id,
 
   (void)this;
   check_params(logit, id, valid_size);
-  TINY_LLM_CHECK(logit.dtype() == DataType::kFloat32);
-  TINY_LLM_CHECK(id.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(valid_size.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(logit.shape().size() == 2);
-  TINY_LLM_CHECK(logit.shape() == id.shape());
 
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);

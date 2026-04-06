@@ -1,5 +1,4 @@
 #include "tiny_llm/logit_processors/sort_processors.hpp"
-#include "logit_processors.hpp"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include <numeric>
 
