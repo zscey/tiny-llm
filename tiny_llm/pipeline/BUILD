@@ -11,7 +11,6 @@ cc_library(
         "//tiny_llm/logit_processors:sample_processors",
         "//tiny_llm/logit_processors:sort_processors",
         "//tiny_llm/logit_processors:temperature_processor",
-        "//tiny_llm/ops/cpu:cpu_ops",
         "//tiny_llm/parser:llama_parser",
         "//tiny_llm/runtime/cuda:cuda_runtime",
         "//tiny_llm/tensor",

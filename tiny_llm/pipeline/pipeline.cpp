@@ -4,7 +4,6 @@
 #include "tiny_llm/logit_processors/sample_processors.hpp"
 #include "tiny_llm/logit_processors/sort_processors.hpp"
 #include "tiny_llm/logit_processors/temperature_processor.hpp"
-#include "tiny_llm/ops/cpu/arithmetic.hpp"
 #include "tiny_llm/parser/llama_parser.hpp"
 #include "tiny_llm/runtime/cuda/cuda_runtime.hpp"
 #include "tiny_llm/tokenizers/huggingface/tokenizers.hpp"
