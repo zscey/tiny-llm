@@ -45,6 +45,8 @@
     "https://bcr.bazel.build/modules/buildozer/7.1.2/source.json": "c9028a501d2db85793a6996205c8de120944f50a0d570438fcae0457a5f9d1f8",
     "https://bcr.bazel.build/modules/fmt/12.0.0/MODULE.bazel": "5308b44200f97df17217c053367537c6d469fe46a61ab0dfc1038c04ceb1d735",
     "https://bcr.bazel.build/modules/fmt/12.0.0/source.json": "20a9d47908eaa8fd46ee7b2fbb0fd9ff02175addfdc1658817798c52604882c1",
+    "https://bcr.bazel.build/modules/gflags/2.2.2.bcr.1/MODULE.bazel": "67bdfd9b6b54c57a5162171739b2e90f5fd056447f642562eff91448f9d37cfb",
+    "https://bcr.bazel.build/modules/gflags/2.2.2.bcr.1/source.json": "04ac4a32d9cb6fcf02dbd63cee53d5c349e55cb219d7f608f39855ea86619188",
     "https://bcr.bazel.build/modules/google_benchmark/1.8.2/MODULE.bazel": "a70cf1bba851000ba93b58ae2f6d76490a9feb74192e57ab8e8ff13c34ec50cb",
     "https://bcr.bazel.build/modules/google_benchmark/1.9.5/MODULE.bazel": "8a85cfd90b1e45e6e68f1aa2aa9efce3c04add57df732571d7fd54c07e7c5143",
     "https://bcr.bazel.build/modules/google_benchmark/1.9.5/source.json": "0bd357fd9db30ee31d5eb4c78b1086ce3d79b4423ce76de19e8a2fa7b2fa2e10",

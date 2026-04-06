@@ -40,6 +40,8 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config) {
   // runtime_
   std::ifstream f(model_root / "config.json");
   auto json = nlohmann::json::parse(f);
+  TINY_LLM_CHECK((!json["torch_dtype"].is_null() &&
+                  json["torch_dtype"].get<std::string>() == "float32"));
   f.close();
   auto plan = cuda::create_cuda_plan(
       llama_parser(json),
@@ -91,8 +93,6 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
                  static_cast<size_t>(unfinished_->shape().at(0)));
 
   auto tokenize_res = tokenizer_->encode(prompts.at(0), true);
-  auto max_len = tokenize_res.size() + max_new_tokens;
-
   {
     runtime_->set_prefill(true);
 
@@ -115,6 +115,8 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
     runtime_->output_copy_to_cpu_tensor("lm_head.out", *output_);
   }
 
+  std::vector<uint32_t> generated_tokens;
+  generated_tokens.reserve(max_new_tokens);
   {
     bool from_prefill{true};
     runtime_->set_prefill(false);
@@ -137,7 +139,8 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
     tiny_llm::Tensor pos_ids({.type = tiny_llm::DeviceType::kCpu, .id = 0},
                              tiny_llm::DataType::kUint32, {1, 1});
 
-    while (tokenize_res.size() < max_len && !all_zero(*unfinished_)) {
+    while (generated_tokens.size() < max_new_tokens &&
+           !all_zero(*unfinished_)) {
       if (!from_prefill) {
         runtime_->cpu_tensor_copy_to_input("token_ids", token_ids);
         runtime_->cpu_tensor_copy_to_input("pos_ids", pos_ids);
@@ -153,17 +156,18 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
       for (auto &processor : wrappers) {
         processor.apply(*output_, *indexes_, *valid_size_);
       }
-      tokenize_res.emplace_back(*indexes_->data<uint32_t>());
+      generated_tokens.emplace_back(*indexes_->data<uint32_t>());
       *unfinished_->data<uint32_t>() =
-          static_cast<uint32_t>(tokenize_res.back() != eos_token_id_);
+          static_cast<uint32_t>(generated_tokens.back() != eos_token_id_);
 
       from_prefill = false;
-      *token_ids.data<uint32_t>() = tokenize_res.back();
-      *pos_ids.data<uint32_t>() = tokenize_res.size() - 1;
+      *token_ids.data<uint32_t>() = generated_tokens.back();
+      *pos_ids.data<uint32_t>() =
+          tokenize_res.size() + generated_tokens.size() - 1;
     }
   }
 
-  return {tokenizer_->decode(tokenize_res, true)};
+  return {tokenizer_->decode(generated_tokens, true)};
 }
 // NOLINTEND(bugprone-easily-swappable-parameters)
 } // namespace tiny_llm
