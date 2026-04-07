@@ -193,26 +193,10 @@
         "recordedRepoMappingEntries": []
       }
     },
-    "@@rules_compdb+//:extensions.bzl%compdb_dep": {
-      "general": {
-        "bzlTransitiveDigest": "NWMXCDTMXVIIEqlbzkz8Mhj0fC4Q4J/WJj3kPNwXTag=",
-        "usagesDigest": "zuWXRj3b/D4mMd5QXGfKQK1VsVwFYOj2tqW7Gh6Ufz0=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "bazel_output_base_util": {
-            "repoRuleId": "@@rules_compdb+//:tools.bzl%bazel_output_base_util",
-            "attributes": {}
-          }
-        },
-        "recordedRepoMappingEntries": []
-      }
-    },
     "@@rules_cuda+//cuda:extensions.bzl%toolchain": {
       "general": {
         "bzlTransitiveDigest": "4ZVUUPHAf3T+CGpb0QH7keDu9F9ICcWTZkEO09Wax8k=",
-        "usagesDigest": "oCKYhtQSpY2r3rBOWQailVjPrgiD8UoD0MXVewR1MaM=",
+        "usagesDigest": "7+Jl2kNwzcEi1C9nq2cQJ/pMuTz1CubHBtrD6la1iFU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
