@@ -40,7 +40,15 @@ cd tiny-llm
 bazelisk build //main -c opt
 ```
 
-### 3. Run Inference
+### 3. Prepare the Model
+
+The engine currently operates on Float32 weights. If your source model snapshot is in FP16, use the provided conversion script to generate the compatible FP32 model weights:
+
+```bash
+python3 scripts/convert_model_to_fp32.py --snap-dir <path_to_fp16_snapshot> --out-dir <path_to_fp32_output>
+```
+
+### 4. Run Inference
 
 ```bash
 ./bazel-bin/main --model_path <path_to_your_model>
