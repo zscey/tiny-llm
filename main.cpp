@@ -70,7 +70,7 @@ auto main(int argc, char **argv) -> int32_t {
           {input_buffer}, static_cast<uint32_t>(FLAGS_max_new_tokens),
           FLAGS_do_sample, static_cast<float>(FLAGS_temperature),
           static_cast<uint32_t>(FLAGS_top_k), static_cast<float>(FLAGS_top_p));
-      std::cout << "[Output Begin] >\n" << result.at(0) << "\n[Output End]\n";
+      std::cout << "[Output] >\n" << result.at(0) << "\n";
     }
   } catch (const std::exception &e) {
     std::cerr << "[Fatal]: " << e.what() << "\n";
