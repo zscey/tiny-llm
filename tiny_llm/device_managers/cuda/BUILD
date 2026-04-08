@@ -17,10 +17,6 @@ cc_library(
     name = "cuda_context",
     srcs = ["cuda_context.cpp"],
     hdrs = ["cuda_context.hpp"],
-    local_defines = [
-        "CUDA_STREAM_POOL_SIZE=32",
-        "MAX_CUDA_DEVICE_NUM=8",
-    ],
     deps = [
         ":cuda_device_guard",
         "//tiny_llm/device_managers:buffer",
