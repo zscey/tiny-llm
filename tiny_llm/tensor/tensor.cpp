@@ -273,6 +273,11 @@ void Tensor::copy_to(Tensor &tensor) const {
 #ifdef TINY_LLM_TENSOR_WITH_CUDA
   case DeviceType::kCuda: {
     switch (tensor.device_.type) {
+    case DeviceType::kCuda:
+      TINY_LLM_CHECK(device_.id == tensor.device_.id);
+      TINY_LLM_CUDA_CHECK(cudaMemcpyAsync(
+          tensor.data(), data(), copy_size, cudaMemcpyDeviceToDevice,
+          ThreadCudaContexts::GetContext().stream));
     case DeviceType::kCudaHost:
     case DeviceType::kCpu:
       TINY_LLM_CUDA_CHECK(cudaMemcpyAsync(
