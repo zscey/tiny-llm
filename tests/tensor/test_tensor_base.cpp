@@ -156,6 +156,8 @@ TYPED_TEST(TensorBaseTest, Copy) {
     if (dev_num > 1) {
       EXPECT_ANY_THROW(
           (void)cuda_tensor.to({.type = DeviceType::kCuda, .id = 1}));
+    } else {
+      cuda_tensor = cuda_tensor.to({.type = DeviceType::kCuda, .id = 0});
     }
     cuda_host_tensor = cuda_tensor.to({.type = DeviceType::kCudaHost, .id = 0});
     ThreadCudaContexts::Synchronize();
