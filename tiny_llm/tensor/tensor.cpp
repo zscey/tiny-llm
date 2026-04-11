@@ -5,7 +5,7 @@
 #include <numeric>
 #include <stdexcept>
 
-#ifdef TENSOR_WITH_CUDA
+#ifdef TINY_LLM_TENSOR_WITH_CUDA
 #include "cuda_runtime.h"
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_context.hpp"
@@ -43,7 +43,7 @@ auto allocate_buffer(Device device, size_t size, size_t alignment = 64)
   switch (device.type) {
   case DeviceType::kCpu:
     return std::make_shared<Buffer>(CpuAllocator::Allocate(size, alignment));
-#ifdef TENSOR_WITH_CUDA
+#ifdef TINY_LLM_TENSOR_WITH_CUDA
   case DeviceType::kCudaHost:
     return std::make_shared<Buffer>(CudaHostAllocator::Allocate(size));
   case DeviceType::kCuda: {
@@ -72,20 +72,27 @@ auto shape_to_stride(const std::vector<int64_t> &shape, DataType dtype)
 auto is_valid_shape(const std::vector<int64_t> &shape) -> bool {
   return std::ranges::all_of(shape, [](auto elem) -> auto { return elem > 0; });
 }
+
+// TODO(hao.lin): adjust the logic after supporting negative stride.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto is_valid_shape_and_stride(const std::vector<int64_t> &shape,
                                const std::vector<int64_t> &stride,
                                DataType dtype) {
-  if (shape.size() != stride.size() || !is_valid_shape(shape)) {
+  if (!is_valid_shape(shape)) {
     return false;
   }
-  auto shape_cum = static_cast<int64_t>(type_size(dtype));
-  for (auto d = static_cast<int32_t>(shape.size()) - 1; d >= 0; --d) {
-    if (shape_cum > std::abs(stride[d])) {
+
+  auto minimum_stride = shape_to_stride(shape, dtype);
+  if (minimum_stride.size() != stride.size()) {
+    return false;
+  }
+
+  for (size_t i = 0, i_end = minimum_stride.size(); i < i_end; ++i) {
+    if (minimum_stride.at(i) > stride.at(i)) {
       return false;
     }
-    shape_cum *= shape[d];
   }
+
   return true;
 }
 } // namespace
@@ -107,10 +114,10 @@ Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
                std::shared_ptr<Buffer> buffer)
     : device_(device), dtype_(dtype), shape_(std::move(shape)),
       stride_(std::move(stride)), offset_(offset), buffer_(std::move(buffer)) {
+  TINY_LLM_CHECK(!shape_.empty());
   if (stride_.empty()) {
     stride_ = shape_to_stride(shape_, dtype_);
   }
-  TINY_LLM_CHECK(!shape_.empty());
   TINY_LLM_CHECK(is_valid_shape_and_stride(shape_, stride_, dtype_));
   TINY_LLM_CHECK(buffer_ != nullptr);
   TINY_LLM_CHECK(device_.type == buffer_->get_device().type);
@@ -157,31 +164,72 @@ auto Tensor::data() const -> const void * {
 }
 
 namespace {
-auto element_size(const std::vector<int64_t> &shape) -> int64_t {
+auto element_size(const std::vector<int64_t> &shape) -> size_t {
   if (shape.empty()) {
     return 0;
   }
   return std::accumulate(shape.begin(), shape.end(), 1,
                          [](auto a, auto b) -> auto { return a * b; });
 }
-} // namespace
 
-void Tensor::reallocate(std::vector<int64_t> shape) {
-  TINY_LLM_CHECK(is_valid_shape(shape));
-  stride_ = shape_to_stride(shape, dtype_);
-
-  if (buffer_ != nullptr &&
-      buffer_->get_size() >=
-          static_cast<size_t>(element_size(shape)) * type_size(dtype_)) {
-    shape_ = std::move(shape);
+auto remove_negative_dim(std::vector<int64_t> &shape, int64_t element_size) {
+  if (shape.empty()) {
     return;
   }
 
-  *this = Tensor(device_, dtype_, std::move(shape));
+  int32_t neg_idx{-1};
+
+  for (int32_t i = 0, i_end = static_cast<int32_t>(shape.size()); i < i_end;
+       ++i) {
+    const auto &cur_dim = shape.at(i);
+    TINY_LLM_CHECK(cur_dim != 0);
+    if (cur_dim < 0) {
+      TINY_LLM_CHECK(cur_dim == -1);
+      TINY_LLM_CHECK(neg_idx < 0);
+      neg_idx = i;
+      continue;
+    }
+
+    TINY_LLM_CHECK((element_size > 0 && element_size % cur_dim == 0));
+    element_size /= cur_dim;
+  }
+
+  if (neg_idx >= 0) {
+    shape.at(neg_idx) = element_size;
+  } else {
+    TINY_LLM_CHECK(element_size == 1);
+  }
+}
+} // namespace
+
+auto Tensor::element_size() const -> size_t {
+  return ::tiny_llm::element_size(shape_);
 }
 
 auto Tensor::is_continuous() const -> bool {
-  return (shape_to_stride(shape_, dtype_) <=> stride_) == 0;
+  return shape_to_stride(shape_, dtype_) == stride_;
+}
+
+void Tensor::reshape(std::vector<int64_t> shape) {
+  TINY_LLM_CHECK(is_continuous());
+  remove_negative_dim(shape, static_cast<int64_t>(element_size()));
+
+  shape_ = std::move(shape);
+  stride_ = shape_to_stride(shape_, dtype_);
+}
+
+void Tensor::reallocate(std::vector<int64_t> shape) {
+  TINY_LLM_CHECK(is_valid_shape(shape));
+  shape_ = std::move(shape);
+  stride_ = shape_to_stride(shape_, dtype_);
+
+  if (buffer_ != nullptr &&
+      buffer_->get_size() >= (element_size() * type_size(dtype_))) {
+    offset_ = 0;
+    return;
+  }
+
+  *this = Tensor(device_, dtype_, shape_);
 }
 
 void Tensor::copy_to(Tensor &tensor) const {
@@ -196,39 +244,39 @@ void Tensor::copy_to(Tensor &tensor) const {
   TINY_LLM_CHECK(dtype_ == tensor.dtype_);
   TINY_LLM_CHECK(shape_ == tensor.shape_);
 
-  auto copy_size =
-      static_cast<size_t>(element_size(shape_)) * type_size(dtype_);
+  auto copy_size = element_size() * type_size(dtype_);
   if (copy_size == 0) {
     return;
   }
+
   switch (device_.type) {
-#ifdef TENSOR_WITH_CUDA
+#ifdef TINY_LLM_TENSOR_WITH_CUDA
   case DeviceType::kCudaHost:
 #endif
   case DeviceType::kCpu: {
     switch (tensor.device_.type) {
-#ifdef TENSOR_WITH_CUDA
+#ifdef TINY_LLM_TENSOR_WITH_CUDA
     case DeviceType::kCuda:
       TINY_LLM_CUDA_CHECK(cudaMemcpyAsync(
-          tensor.data(), this->data(), copy_size, cudaMemcpyHostToDevice,
+          tensor.data(), data(), copy_size, cudaMemcpyHostToDevice,
           ThreadCudaContexts::GetContext().stream));
       return;
     case DeviceType::kCudaHost:
 #endif
     case DeviceType::kCpu:
-      std::memcpy(tensor.data(), this->data(), copy_size);
+      std::memcpy(tensor.data(), data(), copy_size);
       return;
     default:
       break;
     }
   }
-#ifdef TENSOR_WITH_CUDA
+#ifdef TINY_LLM_TENSOR_WITH_CUDA
   case DeviceType::kCuda: {
     switch (tensor.device_.type) {
     case DeviceType::kCudaHost:
     case DeviceType::kCpu:
       TINY_LLM_CUDA_CHECK(cudaMemcpyAsync(
-          tensor.data(), this->data(), copy_size, cudaMemcpyDeviceToHost,
+          tensor.data(), data(), copy_size, cudaMemcpyDeviceToHost,
           ThreadCudaContexts::GetContext().stream));
       return;
     default:
@@ -247,16 +295,9 @@ void Tensor::copy_to(Tensor &tensor) const {
 }
 
 auto Tensor::to(Device device) const -> Tensor {
-  Tensor res(device, dtype_, shape_, true);
+  Tensor res(device, dtype_, shape_);
   copy_to(res);
   return res;
 }
 
-void Tensor::reshape(std::vector<int64_t> shape) {
-  TINY_LLM_CHECK(is_continuous());
-  TINY_LLM_CHECK(element_size(shape) == element_size(shape_));
-
-  shape_ = std::move(shape);
-  stride_ = shape_to_stride(shape_, dtype_);
-}
 } // namespace tiny_llm

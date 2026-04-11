@@ -29,7 +29,7 @@ cc_test(
     }),
     data = ["//tests/datas"],
     local_defines = select({
-        "//platforms/device:cuda": ["TESTS_WITH_CUDA"],
+        "//platforms/device:cuda": ["TINY_LLM_TESTS_WITH_CUDA"],
         "//conditions:default": [],
     }),
     deps = [

@@ -51,9 +51,13 @@ public:
     return static_cast<const T *>(data());
   }
 
-  void reallocate(std::vector<int64_t> shape);
+  [[nodiscard]] auto element_size() const -> size_t;
 
   [[nodiscard]] auto is_continuous() const -> bool;
+
+  void reshape(std::vector<int64_t> shape);
+
+  void reallocate(std::vector<int64_t> shape);
 
   // May async
   void copy_to(Tensor &tensor) const;
@@ -61,13 +65,14 @@ public:
   // May async
   [[nodiscard]] auto to(Device device) const -> Tensor;
 
-  void reshape(std::vector<int64_t> shape);
-
 private:
   Device device_{};
   DataType dtype_{};
-  std::vector<int64_t> shape_;  // element shape
-  std::vector<int64_t> stride_; // byte stride
+  // logical extents of each dimension
+  std::vector<int64_t> shape_;
+  // byte-offset to reach the next element in a given dimension
+  std::vector<int64_t> stride_;
+  // byte-offset
   size_t offset_{};
   std::shared_ptr<Buffer> buffer_;
 };

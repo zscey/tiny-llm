@@ -7,7 +7,7 @@ cc_library(
     srcs = ["tensor.cpp"],
     hdrs = ["tensor.hpp"],
     local_defines = select({
-        "//platforms/device:cuda": ["TENSOR_WITH_CUDA"],
+        "//platforms/device:cuda": ["TINY_LLM_TENSOR_WITH_CUDA"],
         "//conditions:default": [],
     }),
     deps = [

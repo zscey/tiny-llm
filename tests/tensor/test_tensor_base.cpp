@@ -1,161 +1,168 @@
-#ifdef TESTS_WITH_CUDA
-#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
-#endif
 #include "tiny_llm/tensor/tensor.hpp"
 #include "gtest/gtest.h"
+#include <cstring>
+#ifdef TINY_LLM_TESTS_WITH_CUDA
+#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
+#endif
 
 namespace tiny_llm {
-template <Device Dev, DataType Dtype> struct Types {
-  static constexpr Device kDev = Dev;
-  static constexpr DataType kDataType = Dtype;
-};
+namespace {
+template <typename T> auto builtin_type_to_dtype() -> DataType;
+template <> [[maybe_unused]] auto builtin_type_to_dtype<float>() -> DataType {
+  return DataType::kFloat32;
+}
+template <>
+[[maybe_unused]] auto builtin_type_to_dtype<uint32_t>() -> DataType {
+  return DataType::kUint32;
+}
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-cognitive-complexity)
+[[maybe_unused]] void test_tensor_attrs(const Tensor &tensor, Device device,
+                                        DataType dtype,
+                                        const std::vector<int64_t> &shape,
+                                        const std::vector<int64_t> &stride,
+                                        size_t element_size,
+                                        bool is_continuous) {
+  EXPECT_EQ(tensor.device().type, device.type);
+  EXPECT_EQ(tensor.device().id, device.id);
+  EXPECT_EQ(tensor.dtype(), dtype);
+  EXPECT_EQ(tensor.shape(), shape);
+  EXPECT_EQ(tensor.stride(), stride);
+  EXPECT_EQ(tensor.element_size(), element_size);
+  EXPECT_EQ(tensor.is_continuous(), is_continuous);
+}
+// NOLINTEND(bugprone-easily-swappable-parameters,readability-function-cognitive-complexity)
+} // namespace
 
 template <typename T> class TensorBaseTest : public ::testing::Test {
 public:
+  using BuiltinType = T;
   TensorBaseTest()
-      : empty_tensor(T::kDev, T::kDataType),
-        tensor(T::kDev, T::kDataType, {3, 4, 5, 6}), device(T::kDev),
-        dtype(T::kDataType) {}
+      : empty_tensor({.type = DeviceType::kCpu, .id = 0},
+                     builtin_type_to_dtype<T>()),
+        tensor({.type = DeviceType::kCpu, .id = 0}, builtin_type_to_dtype<T>(),
+               {3, 4, 5, 6}) {}
 
   Tensor empty_tensor;
   Tensor tensor;
-  Device device;
-  DataType dtype;
 };
 
-#ifdef TESTS_WITH_CUDA
-using TestTypes = ::testing::Types<
-    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32>,
-    Types<{.type = DeviceType::kCudaHost, .id = 0}, DataType::kFloat32>,
-    Types<{.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32>,
-    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kUint32>,
-    Types<{.type = DeviceType::kCudaHost, .id = 0}, DataType::kUint32>,
-    Types<{.type = DeviceType::kCuda, .id = 0}, DataType::kUint32>>;
-#else
-using TestTypes = ::testing::Types<
-    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32>,
-    Types<{.type = DeviceType::kCpu, .id = 0}, DataType::kUint32>>;
-#endif
-
+using TestTypes = ::testing::Types<float, uint32_t>;
 TYPED_TEST_SUITE(TensorBaseTest, TestTypes);
 
-TYPED_TEST(TensorBaseTest, TensorBaseApi) {
-  // move construct
-  Tensor cur_tensor = std::move(this->empty_tensor);
+TYPED_TEST(TensorBaseTest, PlatformUnrelated) {
+  Device device{.type = DeviceType::kCpu, .id = 0};
+  DataType dtype = builtin_type_to_dtype<typename TestFixture::BuiltinType>();
+  auto type_size_i64 =
+      static_cast<int64_t>(sizeof(typename TestFixture::BuiltinType));
 
-  { // empty_tensor
-    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
-    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
-    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
-    EXPECT_TRUE(cur_tensor.shape().empty());
-    EXPECT_TRUE(cur_tensor.stride().empty());
-    EXPECT_TRUE(cur_tensor.data() == nullptr);
-
-    EXPECT_NO_THROW(void(cur_tensor.to({DeviceType::kCpu})));
-  }
-
-  cur_tensor = std::move(this->tensor);
-  { // non-empty tensor
-    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
-    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
-    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
-    auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
-    EXPECT_TRUE((cur_tensor.shape() == std::vector<int64_t>{3, 4, 5, 6}));
-    EXPECT_TRUE(
-        (cur_tensor.stride() ==
-         std::vector<int64_t>{size * 6 * 5 * 4, size * 6 * 5, size * 6, size}));
-
-    {
-      const auto &const_tensor = cur_tensor;
-      EXPECT_ANY_THROW((void)const_tensor.data());
-    }
+  { // empty case
+    Tensor cur_tensor = std::move(this->empty_tensor);
+    test_tensor_attrs(cur_tensor, device, dtype, {}, {}, 0, true);
+    cur_tensor.reshape({});
+    test_tensor_attrs(cur_tensor, device, dtype, {}, {}, 0, true);
+    cur_tensor.reallocate({1});
+    test_tensor_attrs(cur_tensor, device, dtype, {1}, {type_size_i64}, 1, true);
+    const auto &tensor_ref = cur_tensor;
+    EXPECT_ANY_THROW((void)tensor_ref.data());
     EXPECT_NO_THROW(cur_tensor.data());
-    EXPECT_TRUE(cur_tensor.template data<float>() != nullptr);
+  }
+
+  { // non-empty case
+    Tensor cur_tensor = std::move(this->tensor);
+    test_tensor_attrs(cur_tensor, device, dtype, {3, 4, 5, 6},
+                      {type_size_i64 * 120, type_size_i64 * 30,
+                       type_size_i64 * 6, type_size_i64},
+                      360, true);
+    cur_tensor.reshape({3, -1, 6});
+    test_tensor_attrs(cur_tensor, device, dtype, {3, 20, 6},
+                      {type_size_i64 * 120, type_size_i64 * 6, type_size_i64},
+                      360, true);
+    cur_tensor.reshape({3, 4, 5, 6});
+    test_tensor_attrs(cur_tensor, device, dtype, {3, 4, 5, 6},
+                      {type_size_i64 * 120, type_size_i64 * 30,
+                       type_size_i64 * 6, type_size_i64},
+                      360, true);
+    EXPECT_ANY_THROW(cur_tensor.reshape({3, 4, 6, 6}));
+    EXPECT_ANY_THROW(cur_tensor.reshape({3, 0, 6}));
+    EXPECT_ANY_THROW(cur_tensor.reshape({-1, -1, 6}));
+
+    auto *ori_data = cur_tensor.data();
+    cur_tensor.reallocate({3, 4, 4, 5});
+    EXPECT_EQ(ori_data, cur_tensor.data());
+    test_tensor_attrs(cur_tensor, device, dtype, {3, 4, 4, 5},
+                      {type_size_i64 * 80, type_size_i64 * 20,
+                       type_size_i64 * 5, type_size_i64},
+                      240, true);
+    cur_tensor.reallocate({3, 4, 5, 8});
+    test_tensor_attrs(cur_tensor, device, dtype, {3, 4, 5, 8},
+                      {type_size_i64 * 160, type_size_i64 * 40,
+                       type_size_i64 * 8, type_size_i64},
+                      480, true);
+
     {
-      const auto &const_tensor = cur_tensor;
-      EXPECT_TRUE(const_tensor.data() != nullptr);
+      Tensor new_tensor(
+          device, dtype, {2, 10}, {type_size_i64 * 12, type_size_i64}, 50,
+          std::make_shared<Buffer>(cur_tensor.data(), 480, device));
+      test_tensor_attrs(new_tensor, device, dtype, {2, 10},
+                        {type_size_i64 * 12, type_size_i64}, 20, false);
+      EXPECT_EQ(new_tensor.data(), cur_tensor.data<uint8_t>() + 50);
     }
+  }
+}
 
-    {
-      auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
-      const auto &tensor =
-          Tensor(cur_tensor.device(), cur_tensor.dtype(), {2, 3, 4, 5},
-                 {(((((size * 5) + 1) * 4) + 1) * 3) + 1,
-                  (((size * 5) + 1) * 4) + 1, (size * 5) + 1, size},
-                 20,
-                 std::make_shared<Buffer>(cur_tensor.data(), 1440,
-                                          cur_tensor.device()));
-      EXPECT_TRUE(cur_tensor.is_continuous());
-      EXPECT_NO_THROW((void)(cur_tensor.to({DeviceType::kCpu, 0})));
-#ifdef TESTS_WITH_CUDA
-      EXPECT_NO_THROW((void)(cur_tensor.to({DeviceType::kCudaHost, 0})));
+namespace {
+[[maybe_unused]] void test_tensor_equality(const Tensor &left,
+                                           const Tensor &right) {
+  EXPECT_EQ(left.element_size(), right.element_size());
+  EXPECT_EQ(left.dtype(), right.dtype());
+  EXPECT_EQ(std::memcmp(left.data(), right.data(),
+                        left.element_size() * type_size(left.dtype())),
+            0);
+}
+} // namespace
+
+TYPED_TEST(TensorBaseTest, Copy) {
+  this->empty_tensor.data();
+  this->tensor.data();
+
+  {
+    auto cpu_empty = this->empty_tensor.to({.type = DeviceType::kCpu, .id = 0});
+    EXPECT_EQ(cpu_empty.data(), nullptr);
+#ifdef TINY_LLM_TESTS_WITH_CUDA
+    auto cuda_host_empty =
+        cpu_empty.to({.type = DeviceType::kCudaHost, .id = 0});
+    EXPECT_EQ(cuda_host_empty.data(), nullptr);
+    auto cuda_empty = cuda_host_empty.to({.type = DeviceType::kCuda, .id = 0});
+    EXPECT_EQ(cuda_empty.data(), nullptr);
+    cuda_host_empty = cuda_empty.to({.type = DeviceType::kCudaHost, .id = 0});
+    EXPECT_EQ(cuda_host_empty.data(), nullptr);
+    cpu_empty = cuda_host_empty.to({.type = DeviceType::kCpu, .id = 0});
+    EXPECT_EQ(cpu_empty.data(), nullptr);
 #endif
-      EXPECT_FALSE(tensor.is_continuous());
-      EXPECT_ANY_THROW((void)(tensor.to({DeviceType::kCpu, 0})));
-      EXPECT_ANY_THROW((void)(tensor.to({DeviceType::kCudaHost, 0})));
-      EXPECT_TRUE(
-          tensor.data() ==
-          static_cast<void *>(cur_tensor.template data<uint8_t>() + 20));
-      EXPECT_TRUE((tensor.shape() == std::vector<int64_t>{2, 3, 4, 5}));
-      EXPECT_TRUE((tensor.stride() ==
-                   std::vector<int64_t>{(((((size * 5) + 1) * 4) + 1) * 3) + 1,
-                                        (((size * 5) + 1) * 4) + 1,
-                                        (size * 5) + 1, size}));
-    }
   }
 
-  { // reallocate
-    const auto *ptr = cur_tensor.data();
-    cur_tensor.reallocate({3, 4, 7, 4});
-    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
-    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
-    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
-    // buffer_size >= required_size, ptr not change
-    EXPECT_TRUE(cur_tensor.data() == ptr);
-    EXPECT_TRUE(cur_tensor.shape() == (std::vector<int64_t>{3, 4, 7, 4}));
-    auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
-    EXPECT_TRUE(
-        (cur_tensor.stride() ==
-         std::vector<int64_t>{size * 4 * 7 * 4, size * 7 * 4, size * 4, size}));
-
-    cur_tensor.reallocate({3, 4, 7, 5});
-    (void)(cur_tensor.data());
-    EXPECT_TRUE(cur_tensor.dtype() == this->dtype);
-    EXPECT_TRUE(cur_tensor.device().type == this->device.type);
-    EXPECT_TRUE(cur_tensor.device().id == this->device.id);
-    EXPECT_TRUE(cur_tensor.shape() == (std::vector<int64_t>{3, 4, 7, 5}));
-    EXPECT_TRUE(
-        (cur_tensor.stride() ==
-         std::vector<int64_t>{size * 4 * 7 * 5, size * 7 * 5, size * 5, size}));
-  }
-
-#ifdef TESTS_WITH_CUDA
-  { // copy from x to cuda
-    if (cur_tensor.device().type == DeviceType::kCpu ||
-        cur_tensor.device().type == DeviceType::kCudaHost) {
-      EXPECT_NO_THROW((void)(cur_tensor.to({DeviceType::kCuda, 0})));
+  {
+    auto cpu_tensor = this->tensor.to({.type = DeviceType::kCpu, .id = 0});
+    test_tensor_equality(cpu_tensor, this->tensor);
+#ifdef TINY_LLM_TESTS_WITH_CUDA
+    auto cuda_host_tensor =
+        cpu_tensor.to({.type = DeviceType::kCudaHost, .id = 0});
+    test_tensor_equality(cuda_host_tensor, cpu_tensor);
+    auto cuda_tensor =
+        cuda_host_tensor.to({.type = DeviceType::kCuda, .id = 0});
+    int32_t dev_num{};
+    cudaGetDeviceCount(&dev_num);
+    if (dev_num > 1) {
+      EXPECT_ANY_THROW(
+          (void)cuda_tensor.to({.type = DeviceType::kCuda, .id = 1}));
     }
-
-    if (cur_tensor.device().type == DeviceType::kCuda) {
-      EXPECT_ANY_THROW((void)(cur_tensor.to({DeviceType::kCuda, 0})));
-    }
-  }
-
-  ThreadCudaContexts::Synchronize();
+    cuda_host_tensor = cuda_tensor.to({.type = DeviceType::kCudaHost, .id = 0});
+    ThreadCudaContexts::Synchronize();
+    test_tensor_equality(cuda_host_tensor, cpu_tensor);
+    cpu_tensor = cuda_host_tensor.to({.type = DeviceType::kCpu, .id = 0});
+    test_tensor_equality(cpu_tensor, this->tensor);
 #endif
-
-  { // reshape
-    auto size = static_cast<int64_t>(type_size(cur_tensor.dtype()));
-    cur_tensor.reshape({static_cast<int64_t>(3) * 4 * 7 * 5});
-    EXPECT_EQ(cur_tensor.shape(),
-              std::vector<int64_t>{static_cast<int64_t>(3) * 4 * 7 * 5});
-    EXPECT_EQ(cur_tensor.stride(), std::vector<int64_t>{size});
-
-    cur_tensor.reshape({12, 35});
-    EXPECT_EQ(cur_tensor.shape(), (std::vector<int64_t>{12, 35}));
-    EXPECT_EQ(cur_tensor.stride(), (std::vector<int64_t>{size * 35, size}));
-
-    EXPECT_ANY_THROW(cur_tensor.reshape({12, 36}));
   }
 }
 } // namespace tiny_llm
