@@ -1,6 +1,6 @@
 # tiny-llm
 
-`tiny-llm` is a lightweight, experimental LLM inference implementation developed with C++20 and CUDA. The architecture is designed to be backend-agnostic, providing a proof-of-concept for unified inference abstractions across multiple compute backends (such as CUDA and CPU), though current implementation efforts are focused on high-performance GPU kernels.
+`tiny-llm` is a lightweight, experimental LLM inference engine developed with C++20, Rust, and CUDA. It is designed with a backend-agnostic architecture to support multiple compute backends, with the CUDA backend currently implemented.
 
 ## Prerequisites
 
