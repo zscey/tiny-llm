@@ -36,9 +36,11 @@ class PassManager {
   std::vector<std::unique_ptr<Concept>> pipeline_;
 
 public:
-  template <typename T> void add_pass(T &&pass) {
+  template <typename T>
+    requires(!std::is_same_v<std::decay_t<T>, PassManager>)
+  void add_pass(T &&pass) {
     pipeline_.emplace_back(
-        std::make_unique<Container<T>>(std::forward<T>(pass)));
+        std::make_unique<Container<std::decay_t<T>>>(std::forward<T>(pass)));
   }
 
   void run(Graph &g, WeightManagerWrapper &w) {
@@ -48,7 +50,7 @@ public:
   }
 };
 
-class PruningPass {
+class DCEPass {
 public:
   void run(Graph &g, WeightManagerWrapper &w);
 };

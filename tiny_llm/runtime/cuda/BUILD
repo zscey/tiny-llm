@@ -8,6 +8,7 @@ cc_library(
     hdrs = ["cuda_kernels.hpp"],
     deps = [
         "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/graph:param",
         "//tiny_llm/ops/cuda:cuda_ops",
         "//tiny_llm/runtime:common",
     ],

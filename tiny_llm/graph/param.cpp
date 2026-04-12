@@ -62,6 +62,12 @@ auto input_num(const Param &param) -> uint32_t {
   return std::visit(kInputVisitor, param);
 }
 
+auto output_num(const Param &param) -> uint32_t {
+  return std::visit(
+      [](const auto &p) -> uint32_t { return output_num<decltype(p)>(); },
+      param);
+}
+
 auto get_inplace_input_ids(const Param &param) -> std::vector<uint32_t> {
   return std::visit(kInplaceVisitor, param);
 }

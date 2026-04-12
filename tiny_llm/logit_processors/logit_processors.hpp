@@ -38,8 +38,10 @@ class LogitProcessorWrapper {
 
 public:
   template <LogitProcessor T>
+    requires(!std::is_same_v<std::decay_t<T>, LogitProcessorWrapper>)
   explicit LogitProcessorWrapper(T &&t)
-      : wrapper_(std::make_unique<Container<T>>(std::forward<T>(t))) {}
+      : wrapper_(
+            std::make_unique<Container<std::decay_t<T>>>(std::forward<T>(t))) {}
 
   void apply(Tensor &logit, Tensor &id, Tensor &valid_size) {
     wrapper_->apply(logit, id, valid_size);

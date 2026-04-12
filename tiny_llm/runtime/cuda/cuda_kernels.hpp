@@ -1,9 +1,9 @@
 #pragma once
 
 #include "cuda_runtime.h"
+#include "tiny_llm/graph/param.hpp"
 #include "tiny_llm/runtime/common.hpp"
 #include <cstddef>
-#include <variant>
 
 namespace tiny_llm::cuda {
 /**
@@ -14,7 +14,7 @@ namespace tiny_llm::cuda {
 
 class SiLUKernel {
 public:
-  bool inplace{};
+  SiLUParam param;
 
   size_t element_size{};
 
@@ -26,8 +26,7 @@ public:
 
 class EmbeddingKernel {
 public:
-  uint32_t num_embeddings{};
-  uint32_t hidden_size{};
+  EmbeddingParam param;
 
   size_t element_size{};
 
@@ -39,24 +38,19 @@ public:
 
 class RopeKernel {
 public:
-  uint32_t max_len{};
-  uint32_t head_dim{};
-  double theta{};
-  bool pin{};
+  RopeParam param;
 
   mutable bool initialized{};
 
   /// @brief {} -> {cos, sin}
   void dtype_shape_infer(const TensorDesc *const *input_descs,
                          TensorDesc *const *output_descs) const;
-  void execute(const void *const *inputs, void *const *outputs) const;
+  void execute(const void *const *inputs, void *const *outputs);
 };
 
 class RMSNormKernel {
 public:
-  uint32_t hidden_size{};
-  float eps{};
-  bool inplace{};
+  RMSNormParam param;
 
   size_t element_size{};
 
@@ -68,9 +62,7 @@ public:
 
 class AddKernel {
 public:
-  uint32_t left_idx{0};
-  uint32_t right_idx{1};
-  uint32_t out_idx{2};
+  AddParam param;
 
   size_t element_size{};
 
@@ -82,9 +74,7 @@ public:
 
 class MulKernel {
 public:
-  uint32_t left_idx{0};
-  uint32_t right_idx{1};
-  uint32_t out_idx{2};
+  MulParam param;
 
   size_t element_size{};
 
@@ -96,9 +86,7 @@ public:
 
 class LinearKernel {
 public:
-  uint32_t in_dim{};
-  uint32_t out_dim{};
-  bool bias{};
+  LinearParam param;
 
   size_t element_size{};
 
@@ -111,11 +99,7 @@ public:
 // with kv-cache
 class CausalAttentionKernel {
 public:
-  uint32_t head_dim{};
-  uint32_t q_head{};
-  uint32_t kv_head{};
-  bool bias{};
-  uint32_t max_len{};
+  CausalAttentionParam param;
 
   uint32_t batch{};
   uint32_t seq_len{};
@@ -132,15 +116,12 @@ public:
   /// o_weight, [q_bias, k_bias, v_bias, o_bias]} -{output}
   void dtype_shape_infer(const TensorDesc *const *input_descs,
                          TensorDesc *const *output_descs);
-  void execute(const void *const *inputs, void *const *outputs) const;
+  void execute(const void *const *inputs, void *const *outputs);
 };
 
 class SliceLinearKernel {
 public:
-  uint32_t in_dim{};
-  uint32_t out_dim{};
-  bool bias{};
-  uint32_t only_last_q{};
+  SliceLinearParam param;
 
   uint32_t batch{};
   uint32_t q_end{};

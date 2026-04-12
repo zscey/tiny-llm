@@ -9,6 +9,10 @@
 #include <string>
 
 namespace tiny_llm {
+/**
+ * @brief SliceView represents a non-owning window into a tensor's memory.
+ * Lifetime is tied to the WeightManager providing the data.
+ */
 struct SliceView {
   DataType dtype;
   std::vector<int64_t> shape;
@@ -55,8 +59,10 @@ class WeightManagerWrapper {
 
 public:
   template <WeightManager T>
+    requires(!std::is_same_v<std::decay_t<T>, WeightManagerWrapper>)
   explicit WeightManagerWrapper(T &&t)
-      : wrapper_(std::make_unique<Container<T>>(std::forward<T>(t))) {}
+      : wrapper_(
+            std::make_unique<Container<std::decay_t<T>>>(std::forward<T>(t))) {}
 
   [[nodiscard]] auto get_tensor(const std::string &name) const -> SliceView {
     return wrapper_->get_tensor(name);
