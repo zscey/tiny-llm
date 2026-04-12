@@ -10,49 +10,31 @@ namespace tiny_llm::cuda {
 namespace {
 constexpr auto kKernelGenerator = Visitor{
     [](const SiLUParam &param) -> CudaKernel {
-      return SiLUKernel{.inplace = param.inplace};
+      return SiLUKernel{.param = param};
     },
     [](const EmbeddingParam &param) -> CudaKernel {
-      return EmbeddingKernel{.num_embeddings = param.num_embeddings,
-                             .hidden_size = param.hidden_size};
+      return EmbeddingKernel{.param = param};
     },
     [](const RopeParam &param) -> CudaKernel {
-      return RopeKernel{.max_len = param.max_len,
-                        .head_dim = param.head_dim,
-                        .theta = param.theta,
-                        .pin = param.pin};
+      return RopeKernel{.param = param};
     },
     [](const RMSNormParam &param) -> CudaKernel {
-      return RMSNormKernel{.hidden_size = param.hidden_size,
-                           .eps = param.eps,
-                           .inplace = param.inplace};
+      return RMSNormKernel{.param = param};
     },
     [](const AddParam &param) -> CudaKernel {
-      return AddKernel{.left_idx = param.left_idx,
-                       .right_idx = param.right_idx,
-                       .out_idx = param.out_idx};
+      return AddKernel{.param = param};
     },
     [](const MulParam &param) -> CudaKernel {
-      return MulKernel{.left_idx = param.left_idx,
-                       .right_idx = param.right_idx,
-                       .out_idx = param.out_idx};
+      return MulKernel{.param = param};
     },
     [](const LinearParam &param) -> CudaKernel {
-      return LinearKernel{
-          .in_dim = param.in_dim, .out_dim = param.out_dim, .bias = param.bias};
+      return LinearKernel{.param = param};
     },
     [](const CausalAttentionParam &param) -> CudaKernel {
-      return CausalAttentionKernel{.head_dim = param.head_dim,
-                                   .q_head = param.q_head,
-                                   .kv_head = param.kv_head,
-                                   .bias = param.bias,
-                                   .max_len = param.max_len};
+      return CausalAttentionKernel{.param = param};
     },
     [](const SliceLinearParam &param) -> CudaKernel {
-      return SliceLinearKernel{.in_dim = param.in_dim,
-                               .out_dim = param.out_dim,
-                               .bias = param.bias,
-                               .only_last_q = param.only_last_q};
+      return SliceLinearKernel{.param = param};
     },
 };
 

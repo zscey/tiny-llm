@@ -146,7 +146,7 @@ struct SizeCalculator {
 
   void operator()(const SiLUKernel &kernel) {
     const auto &cur_task = plan->tasks.at(cur_task_id);
-    set_v_block(kernel.inplace ? cur_task.input_descs.at(0) : nullptr,
+    set_v_block(kernel.param.inplace ? cur_task.input_descs.at(0) : nullptr,
                 cur_task.output_descs.at(0));
   }
 
@@ -160,7 +160,7 @@ struct SizeCalculator {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     for (uint32_t i = 0; i < 2; ++i) {
       const auto &cur_desc = cur_task.output_descs.at(i);
-      if (kernel.pin) {
+      if (kernel.param.pin) {
         assign_initializer(cur_desc);
       } else {
         set_v_block(nullptr, cur_desc);
@@ -171,16 +171,16 @@ struct SizeCalculator {
   void operator()(const RMSNormKernel &kernel) {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     assign_initializer(cur_task.input_descs.at(1));
-    set_v_block(kernel.inplace ? cur_task.input_descs.at(0) : nullptr,
+    set_v_block(kernel.param.inplace ? cur_task.input_descs.at(0) : nullptr,
                 cur_task.output_descs.at(0));
   }
 
   void operator()(const AddKernel &kernel) {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     const TensorDesc *from_desc{};
-    if (kernel.out_idx == kernel.left_idx) {
+    if (kernel.param.out_idx == kernel.param.left_idx) {
       from_desc = cur_task.input_descs.at(0);
-    } else if (kernel.out_idx == kernel.right_idx) {
+    } else if (kernel.param.out_idx == kernel.param.right_idx) {
       from_desc = cur_task.input_descs.at(1);
     }
     set_v_block(from_desc, cur_task.output_descs.at(0));
@@ -189,9 +189,9 @@ struct SizeCalculator {
   void operator()(const MulKernel &kernel) {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     const TensorDesc *from_desc{};
-    if (kernel.out_idx == kernel.left_idx) {
+    if (kernel.param.out_idx == kernel.param.left_idx) {
       from_desc = cur_task.input_descs.at(0);
-    } else if (kernel.out_idx == kernel.right_idx) {
+    } else if (kernel.param.out_idx == kernel.param.right_idx) {
       from_desc = cur_task.input_descs.at(1);
     }
     set_v_block(from_desc, cur_task.output_descs.at(0));
@@ -200,7 +200,7 @@ struct SizeCalculator {
   void operator()(const LinearKernel &kernel) {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     assign_initializer(cur_task.input_descs.at(1));
-    if (kernel.bias) {
+    if (kernel.param.bias) {
       assign_initializer(cur_task.input_descs.at(2));
     }
     set_v_block(nullptr, cur_task.output_descs.at(0));
@@ -212,7 +212,7 @@ struct SizeCalculator {
     assign_initializer(cur_task.input_descs.at(5));
     assign_initializer(cur_task.input_descs.at(6));
     assign_initializer(cur_task.input_descs.at(7));
-    if (kernel.bias) {
+    if (kernel.param.bias) {
       assign_initializer(cur_task.input_descs.at(8));
       assign_initializer(cur_task.input_descs.at(9));
       assign_initializer(cur_task.input_descs.at(10));
@@ -224,7 +224,7 @@ struct SizeCalculator {
     const auto &hidden_state_desc = cur_task.input_descs.at(0);
     auto q_o_size = element_num(hidden_state_desc->max_shape) *
                     type_size(hidden_state_desc->dtype);
-    auto k_v_size = q_o_size / kernel.q_head * kernel.kv_head;
+    auto k_v_size = q_o_size / kernel.param.q_head * kernel.param.kv_head;
     inner_relation.emplace_back(0, dynamic_gmp.allocate(q_o_size, kAlign),
                                 false);
     inner_relation.emplace_back(0, static_gmp.allocate(k_v_size, kAlign), true);
@@ -238,7 +238,7 @@ struct SizeCalculator {
   void operator()(const SliceLinearKernel &kernel) {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     assign_initializer(cur_task.input_descs.at(1));
-    if (kernel.bias) {
+    if (kernel.param.bias) {
       assign_initializer(cur_task.input_descs.at(2));
     }
     set_v_block(nullptr, cur_task.output_descs.at(0));
@@ -319,8 +319,9 @@ struct WeightAssigner {
 
   void operator()(const EmbeddingKernel &kernel) const {
     const auto &cur_task = plan->tasks.at(cur_task_id);
-    check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
-                          {kernel.num_embeddings, kernel.hidden_size});
+    check_and_copy_weight(
+        cur_task.input_descs.at(1), cur_task.inputs.at(1),
+        {kernel.param.num_embeddings, kernel.param.hidden_size});
   }
 
   void operator()(const RopeKernel & /*unused*/) const {}
@@ -328,7 +329,7 @@ struct WeightAssigner {
   void operator()(const RMSNormKernel &kernel) const {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
-                          {kernel.hidden_size});
+                          {kernel.param.hidden_size});
   }
 
   void operator()(const AddKernel & /*unused*/) const {}
@@ -338,16 +339,16 @@ struct WeightAssigner {
   void operator()(const LinearKernel &kernel) const {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
-                          {kernel.out_dim, kernel.in_dim});
-    if (kernel.bias) {
+                          {kernel.param.out_dim, kernel.param.in_dim});
+    if (kernel.param.bias) {
       check_and_copy_weight(cur_task.input_descs.at(2), cur_task.inputs.at(2),
-                            {kernel.out_dim});
+                            {kernel.param.out_dim});
     }
   }
 
   void operator()(const CausalAttentionKernel &kernel) const {
-    auto q_dim = kernel.head_dim * kernel.q_head;
-    auto kv_dim = kernel.head_dim * kernel.kv_head;
+    auto q_dim = kernel.param.head_dim * kernel.param.q_head;
+    auto kv_dim = kernel.param.head_dim * kernel.param.kv_head;
 
     const auto &cur_task = plan->tasks.at(cur_task_id);
     check_and_copy_weight(cur_task.input_descs.at(4), cur_task.inputs.at(4),
@@ -358,7 +359,7 @@ struct WeightAssigner {
                           {kv_dim, q_dim});
     check_and_copy_weight(cur_task.input_descs.at(7), cur_task.inputs.at(7),
                           {q_dim, q_dim});
-    if (kernel.bias) {
+    if (kernel.param.bias) {
       check_and_copy_weight(cur_task.input_descs.at(8), cur_task.inputs.at(8),
                             {q_dim});
       check_and_copy_weight(cur_task.input_descs.at(9), cur_task.inputs.at(9),
@@ -373,10 +374,10 @@ struct WeightAssigner {
   void operator()(const SliceLinearKernel &kernel) const {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
-                          {kernel.out_dim, kernel.in_dim});
-    if (kernel.bias) {
+                          {kernel.param.out_dim, kernel.param.in_dim});
+    if (kernel.param.bias) {
       check_and_copy_weight(cur_task.input_descs.at(2), cur_task.inputs.at(2),
-                            {kernel.out_dim});
+                            {kernel.param.out_dim});
     }
   }
 };

@@ -61,6 +61,7 @@ public:
   uint32_t max_len{};
 };
 
+// TODO(hao.lin): add SliceParam explicitly
 // [b, q - only_last_q:, in] -> [b, only_last_q, out]
 class SliceLinearParam {
 public:
@@ -100,18 +101,14 @@ template <> constexpr auto output_num_impl<RopeParam>() -> uint32_t {
 } // namespace details
 
 template <typename T> constexpr auto extern_input_num() -> uint32_t {
-  return details::extern_input_num_impl<std::remove_cvref_t<T>>();
+  return details::extern_input_num_impl<std::decay_t<T>>();
 }
 auto input_num(const Param &param) -> uint32_t;
 
 template <typename T> constexpr auto output_num() -> uint32_t {
-  return details::output_num_impl<std::remove_cvref_t<T>>();
+  return details::output_num_impl<std::decay_t<T>>();
 }
-inline auto output_num(const Param &param) -> uint32_t {
-  return std::visit(
-      [](const auto &p) -> uint32_t { return output_num<decltype(p)>(); },
-      param);
-}
+auto output_num(const Param &param) -> uint32_t;
 
 auto get_inplace_input_ids(const Param &param) -> std::vector<uint32_t>;
 } // namespace tiny_llm

@@ -59,8 +59,11 @@ class TokenizerWrapper {
 
 public:
   template <Tokenizer T>
+    requires(!std::is_same_v<std::decay_t<T>, TokenizerWrapper>)
   explicit TokenizerWrapper(T &&t)
-      : wrapper_(std::make_unique<Container<T>>(std::forward<T>(t))) {}
+      : wrapper_(
+            std::make_unique<Container<std::decay_t<T>>>(std::forward<T>(t))) {}
+
   auto encode(const std::string &token, bool add_special_tokens)
       -> std::vector<uint32_t> {
     return wrapper_->encode(token, add_special_tokens);

@@ -73,6 +73,7 @@ void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
     }
 
     uint32_t last_idx{};
+    // delete the consumer_nodes of the output
     auto &consumer_nodes = g.tensor_infos.at(tensor_id)->second.consumer_nodes;
     for (uint32_t idx = 0, idx_end = consumer_nodes.size(); idx < idx_end;
          ++idx) {
@@ -94,7 +95,7 @@ void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
 }
 } // namespace
 
-void PruningPass::run(Graph &g, WeightManagerWrapper & /*w*/) {
+void DCEPass::run(Graph &g, WeightManagerWrapper & /*w*/) {
   (void)(this);
 
   std::vector<bool> is_visited(g.nodes.size(), false);
@@ -131,5 +132,5 @@ void PruningPass::run(Graph &g, WeightManagerWrapper & /*w*/) {
   shrink(g, retain_nodes);
 }
 
-static_assert(GraphPass<PruningPass>);
+static_assert(GraphPass<DCEPass>);
 } // namespace tiny_llm
