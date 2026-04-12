@@ -22,11 +22,9 @@ public:
 
   void bind_input(const std::string &name, const Tensor &tensor) override;
 
-  // sync
   void cpu_tensor_copy_to_input(const std::string &name,
                                 const Tensor &tensor) override;
 
-  // sync
   void output_copy_to_cpu_tensor(const std::string &name,
                                  Tensor &tensor) const override;
 

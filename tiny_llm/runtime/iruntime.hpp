@@ -19,9 +19,11 @@ public:
 
   virtual void bind_input(const std::string &name, const Tensor &tensor) = 0;
 
+  // sync
   virtual void cpu_tensor_copy_to_input(const std::string &name,
                                         const Tensor &tensor) = 0;
 
+  // sync
   virtual void output_copy_to_cpu_tensor(const std::string &name,
                                          Tensor &tensor) const = 0;
 
