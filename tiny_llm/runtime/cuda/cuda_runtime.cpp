@@ -68,8 +68,7 @@ struct SizeCalculator {
   GreedyMemoryPlaner dynamic_gmp;
   GreedyMemoryPlaner static_gmp;
   std::vector<Relation> relations;
-  std::unordered_map<const CausalAttentionKernel *, std::vector<Relation>>
-      attn_relations;
+  std::unordered_map<const void *, std::vector<Relation>> inner_relations;
   std::unordered_map<const void *, uint32_t> desc_ptr_to_id;
 
   uint32_t cur_task_id{};
@@ -102,7 +101,7 @@ struct SizeCalculator {
       }
       // visitor
       // 1. set the `v_block`, `exclusive` of the output
-      // 2. [option, inplace] set the `dependence` of the input to 0, inherites
+      // 2. [option, inplace] set the `dependence` of the input to 0, inherits
       // the `v_block` of the input
       // 3. [option, initializer] set the `dependence`, `v_block`, `exclusive`
       // of the initializer
@@ -220,7 +219,7 @@ struct SizeCalculator {
     }
     set_v_block(nullptr, cur_task.output_descs.at(0));
 
-    auto &inner_relation = attn_relations[&kernel];
+    auto &inner_relation = inner_relations[&kernel];
     const auto &hidden_state_desc = cur_task.input_descs.at(0);
     auto q_o_size = element_num(hidden_state_desc->max_shape) *
                     type_size(hidden_state_desc->dtype);
@@ -271,19 +270,19 @@ struct SizeCalculator {
 
       if (std::holds_alternative<CausalAttentionKernel>(task.kernel)) {
         auto &cur_kernel = std::get<CausalAttentionKernel>(task.kernel);
-        const auto &attn_relation = attn_relations.at(&cur_kernel);
-        TINY_LLM_CHECK(attn_relation.at(0).exclusive == false);
+        const auto &inner_relation = inner_relations.at(&cur_kernel);
+        TINY_LLM_CHECK(inner_relation.at(0).exclusive == false);
         cur_kernel.q_cache = reinterpret_cast<float *>(
-            ptrs.dynamic_ptr + attn_relation.at(0).v_block.offset);
-        TINY_LLM_CHECK(attn_relation.at(1).exclusive);
+            ptrs.dynamic_ptr + inner_relation.at(0).v_block.offset);
+        TINY_LLM_CHECK(inner_relation.at(1).exclusive);
         cur_kernel.k_cache = reinterpret_cast<float *>(
-            ptrs.static_ptr + attn_relation.at(1).v_block.offset);
-        TINY_LLM_CHECK(attn_relation.at(2).exclusive);
+            ptrs.static_ptr + inner_relation.at(1).v_block.offset);
+        TINY_LLM_CHECK(inner_relation.at(2).exclusive);
         cur_kernel.v_cache = reinterpret_cast<float *>(
-            ptrs.static_ptr + attn_relation.at(2).v_block.offset);
-        TINY_LLM_CHECK(attn_relation.at(3).exclusive == false);
+            ptrs.static_ptr + inner_relation.at(2).v_block.offset);
+        TINY_LLM_CHECK(inner_relation.at(3).exclusive == false);
         cur_kernel.o_cache = reinterpret_cast<float *>(
-            ptrs.dynamic_ptr + attn_relation.at(3).v_block.offset);
+            ptrs.dynamic_ptr + inner_relation.at(3).v_block.offset);
       }
     }
   }
@@ -410,6 +409,7 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
 
   WeightAssigner weight_assigner(plan_, weight_manager_wrapper);
   weight_assigner.assign_weights();
+
   ThreadCudaContexts::Synchronize();
 }
 
@@ -442,6 +442,7 @@ void check_input(const CudaRuntime &cuda_runtime, const std::string &name,
       cuda_runtime.plan_.input_infos.at(name).first);
   TINY_LLM_CHECK(desc.dtype == tensor.dtype());
   TINY_LLM_CHECK(desc.cur_shape.size() == tensor.shape().size());
+  TINY_LLM_CHECK(tensor.is_continuous());
   const auto &min_shape =
       cuda_runtime.plan_.plan_config.named_shape_ranges.at(name).min_shape;
   for (size_t i = 0, i_end = desc.cur_shape.size(); i < i_end; ++i) {
