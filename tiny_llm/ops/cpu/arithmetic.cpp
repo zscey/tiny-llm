@@ -55,30 +55,27 @@ void arithmetic_kernel(const float *left, float right, float *dst, size_t beg,
 } // namespace
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define CASE_OF_TYPE(type)                                                     \
-  case type:                                                                   \
-    parallel_run(                                                              \
-        [left, right, dst](size_t beg, size_t end) -> void {                   \
-          arithmetic_kernel<type>(left, right, dst, beg, end);                 \
-        },                                                                     \
-        0, element_size);                                                      \
-    return;
+#define RUN_KERNEL(type)                                                       \
+  parallel_run(                                                                \
+      [left, right, dst](size_t beg, size_t end) -> void {                     \
+        arithmetic_kernel<type>(left, right, dst, beg, end);                   \
+      },                                                                       \
+      0, element_size);                                                        \
+  return;
 
 void arithmetic(const float *left, float right, float *dst, size_t element_size,
                 ArithmeticType type) {
   switch (type) {
-    CASE_OF_TYPE(ArithmeticType::kAdd);
-    CASE_OF_TYPE(ArithmeticType::kMul);
-    CASE_OF_TYPE(ArithmeticType::kSub);
+  case ArithmeticType::kAdd:
+    RUN_KERNEL(ArithmeticType::kAdd);
+  case ArithmeticType::kMul:
+    RUN_KERNEL(ArithmeticType::kMul);
+  case ArithmeticType::kSub:
+    RUN_KERNEL(ArithmeticType::kSub);
   case ArithmeticType::kDiv:
     TINY_LLM_CHECK(right != 0.F);
     right = 1.F / right;
-    parallel_run(
-        [left, right, dst](size_t beg, size_t end) -> void {
-          arithmetic_kernel<ArithmeticType::kMul>(left, right, dst, beg, end);
-        },
-        0, element_size);
-    return;
+    RUN_KERNEL(ArithmeticType::kMul);
   }
 }
 } // namespace tiny_llm::cpu
