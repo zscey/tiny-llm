@@ -59,8 +59,10 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config) {
   runtime_ = std::make_unique<cuda::CudaRuntime>(std::move(plan), wm);
 
   // output_
-  output_ = std::make_unique<Tensor>(Device{.type = DeviceType::kCpu, .id = 0},
-                                     DataType::kFloat32);
+  output_ = std::make_unique<Tensor>(
+      Device{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32,
+      std::vector<int64_t>{static_cast<int64_t>(config.batch), 1,
+                           json["vocab_size"].get<int64_t>()});
 
   // eos_token_id_
   eos_token_id_ = json["eos_token_id"].is_null()
