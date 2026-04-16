@@ -288,7 +288,7 @@ gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
 void gemm_row_major(const float *input, const float *weight, const float *bias,
                     float *dst, uint32_t m, uint32_t d, uint32_t n) {
   TINY_LLM_CHECK(bias == nullptr);
-  if (m * d * n == 0) {
+  if (m == 0 || d == 0 || n == 0) {
     return;
   }
 
@@ -305,7 +305,7 @@ void gemm_row_major_lt(const float *input, const float *weight,
                        uint32_t q_start, uint32_t q_end) {
   TINY_LLM_CHECK(bias == nullptr);
   TINY_LLM_CHECK(q_start + q <= q_end);
-  if (b * q * d * out_head * out_d == 0) {
+  if (b == 0 || q == 0 || d == 0 || out_head == 0 || out_d == 0) {
     return;
   }
 
@@ -321,7 +321,7 @@ void gemm_row_major_tl(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t h,
                        uint32_t q, uint32_t d, uint32_t out_d) {
   TINY_LLM_CHECK(bias == nullptr);
-  if (b * h * q * d * out_d == 0) {
+  if (b == 0 || h == 0 || q == 0 || d == 0 || out_d == 0) {
     return;
   }
 
@@ -339,7 +339,7 @@ void gemm_row_major_l(const float *input, const float *weight,
                       uint32_t q_end) {
   TINY_LLM_CHECK(bias == nullptr);
   TINY_LLM_CHECK(q_start + q <= q_end);
-  if (b * q * d * n == 0) {
+  if (b == 0 || q == 0 || d == 0 || n == 0) {
     return;
   }
 
