@@ -29,17 +29,114 @@ TEST(CudaOps, GemmManual) {
     weight = weight.to(target_dev);
   }
 
-  Tensor dst(target_dev, DataType::kFloat32, {m, n});
-  cuda::gemm_row_major(input.data<float>(), weight.data<float>(), nullptr,
-                       dst.data<float>(), m, d, n);
-  auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+  {
+    Tensor dst(target_dev, DataType::kFloat32, {m, n});
+    cuda::gemm_row_major(input.data<float>(), weight.data<float>(), nullptr,
+                         dst.data<float>(), m, d, n);
+    auto cpu_dst = dst.to({.type = DeviceType::kCpu});
 
-  std::vector<float> target_res{5.F, 14.F, 23.F, 32.F, 14.F, 50.F, 86.F, 122.F};
-  ThreadCudaContexts::Synchronize();
+    std::vector<float> target_res{5.F,  14.F, 23.F, 32.F,
+                                  14.F, 50.F, 86.F, 122.F};
+    ThreadCudaContexts::Synchronize();
 
-  const auto *dst_ptr = cpu_dst.data<float>();
-  for (size_t i = 0, i_end = static_cast<size_t>(m * n); i < i_end; ++i) {
-    EXPECT_FLOAT_EQ(dst_ptr[i], target_res.at(i));
+    const auto *dst_ptr = cpu_dst.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(m * n); i < i_end; ++i) {
+      EXPECT_FLOAT_EQ(dst_ptr[i], target_res.at(i));
+    }
+  }
+
+  { // gemm m1
+    Tensor dst(target_dev, DataType::kFloat32, {1, n});
+    cuda::gemm_row_major(input.data<float>(), weight.data<float>(), nullptr,
+                         dst.data<float>(), 1, d, n);
+    auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+    std::vector<float> target_res{5.F, 14.F, 23.F, 32.F};
+    ThreadCudaContexts::Synchronize();
+
+    const auto *dst_ptr = cpu_dst.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(1 * n); i < i_end; ++i) {
+      EXPECT_FLOAT_EQ(dst_ptr[i], target_res.at(i));
+    }
+  }
+  { // gemm_ lt
+    int64_t b = 2;
+    int64_t q = 1;
+    int64_t d = 3;
+    int64_t out_h = 2;
+    int64_t out_d = 4;
+
+    Tensor lt_input({.type = DeviceType::kCpu}, DataType::kFloat32, {b, q, d});
+    {
+      auto *lt_input_ptr = lt_input.data<float>();
+      for (size_t i = 0, i_end = static_cast<size_t>(b * q * d); i < i_end;
+           ++i) {
+        lt_input_ptr[i] = static_cast<float>(i % 100);
+      }
+      lt_input = lt_input.to(target_dev);
+    }
+
+    Tensor lt_weight({.type = DeviceType::kCpu}, DataType::kFloat32,
+                     {out_h * out_d, d});
+    {
+      auto *lt_weight_ptr = lt_weight.data<float>();
+      for (size_t i = 0, i_end = static_cast<size_t>(out_h * out_d * d);
+           i < i_end; ++i) {
+        lt_weight_ptr[i] = static_cast<float>(i % 100);
+      }
+      lt_weight = lt_weight.to(target_dev);
+    }
+
+    int64_t q_start = 3;
+    int64_t q_end = 5;
+    Tensor dst(target_dev, DataType::kFloat32, {b, out_h, q_end, out_d});
+    cuda::gemm_row_major_lt(lt_input.data<float>(), lt_weight.data<float>(),
+                            nullptr, dst.data<float>(), b, q, d, out_h, out_d,
+                            q_start, q_end);
+    auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+    std::vector<std::vector<float>> target_res{{5.F, 14.F, 23.F, 32.F},
+                                               {41.F, 50.F, 59.F, 68.F},
+                                               {14.F, 50.F, 86.F, 122.F},
+                                               {158.F, 194.F, 230.F, 266.F}};
+    ThreadCudaContexts::Synchronize();
+
+    for (size_t i = 0, i_end = static_cast<size_t>(b * out_h); i < i_end; ++i) {
+      const auto *dst_ptr =
+          cpu_dst.data<float>() + ((i * q_end + q_start) * out_d);
+      for (size_t j = 0, j_end = static_cast<size_t>(out_d); j < j_end; ++j) {
+        EXPECT_FLOAT_EQ(dst_ptr[j], target_res.at(i).at(j));
+      }
+    }
+  }
+  { // gemm_tl q1
+    Tensor dst(target_dev, DataType::kFloat32, {m, n});
+    cuda::gemm_row_major_tl(input.data<float>(), weight.data<float>(), nullptr,
+                            dst.data<float>(), 2, 1, 1, 3, 4);
+    auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+    std::vector<float> target_res{5.F,  14.F, 23.F, 32.F,
+                                  14.F, 50.F, 86.F, 122.F};
+    ThreadCudaContexts::Synchronize();
+
+    const auto *dst_ptr = cpu_dst.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(m * n); i < i_end; ++i) {
+      EXPECT_FLOAT_EQ(dst_ptr[i], target_res.at(i));
+    }
+  }
+  { // gemm_sl q1
+    Tensor dst(target_dev, DataType::kFloat32, {1, n});
+    cuda::gemm_row_major_sl(input.data<float>(), weight.data<float>(), nullptr,
+                            dst.data<float>(), m, 1, d, n, 1, 2);
+    auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+    std::vector<float> target_res{14.F, 50.F, 86.F, 122.F};
+    ThreadCudaContexts::Synchronize();
+
+    const auto *dst_ptr = cpu_dst.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(1 * n); i < i_end; ++i) {
+      EXPECT_FLOAT_EQ(dst_ptr[i], target_res.at(i));
+    }
   }
 }
 

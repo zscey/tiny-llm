@@ -94,6 +94,7 @@ void bm_gemm_sl(benchmark::State &state) {
 } // namespace
 
 BENCHMARK(bm_gemm)
+    ->Args({1, 2048, 2048})
     ->Args({127, 511, 243})
     ->Args({511, 127, 243})
     ->Args({4095, 8191, 6033})
@@ -102,6 +103,7 @@ BENCHMARK(bm_gemm)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK(bm_gemm_lt)
+    ->Args({2, 2048, 2048})
     ->Args({127, 511, 243})
     ->Args({511, 127, 243})
     ->Args({4095, 8191, 6033})
@@ -110,6 +112,7 @@ BENCHMARK(bm_gemm_lt)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK(bm_gemm_tl)
+    ->Args({2, 2048, 2048})
     ->Args({127, 511, 243})
     ->Args({511, 127, 243})
     ->Args({4095, 8191, 6033})
@@ -118,6 +121,7 @@ BENCHMARK(bm_gemm_tl)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK(bm_gemm_sl)
+    ->Args({2, 2048, 2048})
     ->Args({127, 511, 243})
     ->Args({511, 127, 243})
     ->Args({4095, 8191, 6033})
