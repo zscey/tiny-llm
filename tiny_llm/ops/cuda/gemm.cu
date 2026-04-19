@@ -76,6 +76,7 @@ struct TLIndexer {
            cur_d;
   }
 };
+static_assert(Indexer<TLIndexer>);
 
 struct SLIndexer {
   uint32_t q;
@@ -90,6 +91,7 @@ struct SLIndexer {
     return (((cur_b * q_end) + cur_q) * d) + col;
   }
 };
+static_assert(Indexer<SLIndexer>);
 
 template <GemmConfig Config, Indexer FetchIndexer>
 __device__ void
@@ -426,9 +428,9 @@ __global__ void gemm_row_major_tl_no_bias_kernel(const float *input,
   write_dst(&res[0][0], dst, b * q, out_d);
 }
 
-__device__ void fetch_input_l(const float *input, float *input_buffer,
-                              uint32_t col_block_idx, uint32_t b, uint32_t q,
-                              uint32_t d, uint32_t q_start, uint32_t q_end) {
+__device__ void fetch_input_sl(const float *input, float *input_buffer,
+                               uint32_t col_block_idx, uint32_t b, uint32_t q,
+                               uint32_t d, uint32_t q_start, uint32_t q_end) {
   auto buffer_col = (col_block_idx * kBlockSize) + threadIdx.x;
   for (uint32_t ty = 0; ty < kTileY; ++ty) {
     auto *buffer_data =
@@ -462,7 +464,7 @@ gemm_row_major_sl_no_bias_kernel(const float *input, const float *weight,
 
   auto block_num = CalBlockNum(d, kBlockSize);
   for (uint32_t i = 0; i < block_num; ++i) {
-    fetch_input_l(input, &input_buffer[0][0], i, b, q, d, q_start, q_end);
+    fetch_input_sl(input, &input_buffer[0][0], i, b, q, d, q_start, q_end);
     fetch_weight(weight, &weight_buffer[0][0], i, n, d);
     __syncthreads();
 
