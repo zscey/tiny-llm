@@ -68,6 +68,29 @@ void bm_gemm_tl(benchmark::State &state) {
     ThreadCudaContexts::Synchronize();
   }
 }
+
+void bm_gemm_sl(benchmark::State &state) {
+  int64_t b = 2;
+  int64_t q_start = 3;
+  int64_t q = state.range(0) / 2;
+  int64_t q_end = q_start + q + 10;
+  int64_t d = state.range(1);
+  int64_t n = state.range(2);
+
+  Tensor input({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
+               {b, q_end, d}, true);
+  Tensor weight({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
+                {n, d}, true);
+  Tensor dst({.type = DeviceType::kCuda, .id = 0}, DataType::kFloat32,
+             {b, q, n}, true);
+  ThreadCudaContexts::Synchronize();
+
+  for (auto _ : state) {
+    cuda::gemm_row_major_sl(input.data<float>(), weight.data<float>(), nullptr,
+                            dst.data<float>(), b, q, d, n, q_start, q_end);
+    ThreadCudaContexts::Synchronize();
+  }
+}
 } // namespace
 
 BENCHMARK(bm_gemm)
@@ -87,6 +110,14 @@ BENCHMARK(bm_gemm_lt)
     ->Unit(benchmark::kMillisecond);
 
 BENCHMARK(bm_gemm_tl)
+    ->Args({127, 511, 243})
+    ->Args({511, 127, 243})
+    ->Args({4095, 8191, 6033})
+    ->Args({8191, 4095, 6033})
+    ->Args({10245, 10241, 10243})
+    ->Unit(benchmark::kMillisecond);
+
+BENCHMARK(bm_gemm_sl)
     ->Args({127, 511, 243})
     ->Args({511, 127, 243})
     ->Args({4095, 8191, 6033})

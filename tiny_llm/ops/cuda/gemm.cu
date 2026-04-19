@@ -32,13 +32,64 @@ concept Indexer = requires(const T &t, uint32_t row, uint32_t col) {
 };
 
 struct NDIndexer {
-  size_t stride;
+  uint32_t stride;
   __device__ __forceinline__ auto operator()(uint32_t row, uint32_t col) const
       -> size_t {
-    return (row * stride) + col;
+    return (static_cast<size_t>(row) * stride) + col;
   }
 };
 static_assert(Indexer<NDIndexer>);
+
+struct LTIndexer {
+  uint32_t q;
+  uint32_t q_start;
+  uint32_t q_end;
+  uint32_t out_h;
+  uint32_t out_d;
+  __device__ __forceinline__ auto operator()(uint32_t row, uint32_t col) const
+      -> size_t {
+    auto cur_b = row / q;
+    auto cur_q = q_start + (row % q);
+    auto cur_out_h = col / out_d;
+    auto cur_out_d = col % out_d;
+
+    return (((((static_cast<size_t>(cur_b) * out_h) + cur_out_h) * q_end) +
+             cur_q) *
+            out_d) +
+           cur_out_d;
+  }
+};
+static_assert(Indexer<LTIndexer>);
+
+struct TLIndexer {
+  uint32_t h;
+  uint32_t q;
+  uint32_t d;
+  __device__ __forceinline__ auto operator()(uint32_t row, uint32_t col) const
+      -> size_t {
+    auto cur_b = row / q;
+    auto cur_q = row % q;
+    auto cur_h = col / d;
+    auto cur_d = col % d;
+
+    return (((((static_cast<size_t>(cur_b) * h) + cur_h) * q) + cur_q) * d) +
+           cur_d;
+  }
+};
+
+struct SLIndexer {
+  uint32_t q;
+  uint32_t q_start;
+  uint32_t q_end;
+  uint32_t d;
+  __device__ __forceinline__ auto operator()(uint32_t row, uint32_t col) const
+      -> size_t {
+    auto cur_b = row / q;
+    auto cur_q = q_start + (row % q);
+
+    return (((cur_b * q_end) + cur_q) * d) + col;
+  }
+};
 
 template <GemmConfig Config, Indexer FetchIndexer>
 __device__ void
@@ -88,19 +139,18 @@ fetch_weight(const float *weight, float *weight_buffer, uint32_t col_idx,
   }
 }
 
-template <uint32_t TileX, uint32_t TileY, uint32_t BlockSize,
-          Indexer WriteIndexer>
+template <GemmConfig Config, Indexer WriteIndexer>
 // NOLINTNEXTLINE(readability-non-const-parameter)
 __device__ void write_dst(const float *res, float *dst, uint32_t m, uint32_t n,
                           WriteIndexer write_indexer) {
-  for (uint32_t ty = 0; ty < TileY; ++ty) {
-    auto dst_row =
-        (blockIdx.y * BlockSize * TileY) + (ty * BlockSize) + threadIdx.y;
-    for (uint32_t tx = 0; tx < TileX; ++tx) {
-      auto dst_col =
-          (blockIdx.x * BlockSize * TileX) + (tx * BlockSize) + threadIdx.x;
+  for (uint32_t ty = 0; ty < Config::kTileY; ++ty) {
+    auto dst_row = (blockIdx.y * Config::kTileY * Config::kThreadNumY) +
+                   (ty * Config::kThreadNumY) + threadIdx.y;
+    for (uint32_t tx = 0; tx < Config::kTileX; ++tx) {
+      auto dst_col = (blockIdx.x * Config::kTileX * Config::kThreadNumX) +
+                     (tx * Config::kThreadNumX) + threadIdx.x;
       if (dst_row < m && dst_col < n) {
-        dst[write_indexer(dst_row, dst_col)] = res[(ty * TileX) + tx];
+        dst[write_indexer(dst_row, dst_col)] = res[(ty * Config::kTileX) + tx];
       }
     }
   }
@@ -155,8 +205,7 @@ __global__ void gemm_no_bias_kernel(const float *input, const float *weight,
     __syncthreads();
   }
 
-  write_dst<Config::kTileX, Config::kTileY, Config::kBlockSize, DstIndexer>(
-      &res[0][0], dst, m, n, dst_indexer);
+  write_dst<Config, DstIndexer>(&res[0][0], dst, m, n, dst_indexer);
 }
 
 constexpr uint32_t kBlockSize = 16;
@@ -397,9 +446,9 @@ __device__ void fetch_input_l(const float *input, float *input_buffer,
 }
 
 __global__ void
-gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
-                                float *dst, uint32_t b, uint32_t q, uint32_t d,
-                                uint32_t n, uint32_t q_start, uint32_t q_end) {
+gemm_row_major_sl_no_bias_kernel(const float *input, const float *weight,
+                                 float *dst, uint32_t b, uint32_t q, uint32_t d,
+                                 uint32_t n, uint32_t q_start, uint32_t q_end) {
   __shared__ float input_buffer[kBlockSize][(kBlockSize * kTileY) + 1];
   __shared__ float weight_buffer[kBlockSize][(kBlockSize * kTileX) + 1];
   float res[kTileY][kTileX];
@@ -437,23 +486,6 @@ gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
   write_dst(&res[0][0], dst, b * q, n);
 }
 } // namespace
-
-void gemm(const float *input, const float *weight, const float *bias,
-          float *dst, uint32_t m, uint32_t d, uint32_t n) {
-  TINY_LLM_CHECK(bias == nullptr);
-  if (m == 0 || d == 0 || n == 0) {
-    return;
-  }
-
-  gemm_no_bias_kernel<NormalGemmConfig, NDIndexer, NDIndexer, NDIndexer>
-      <<<dim3{CalBlockNum(n, NormalGemmConfig::kThreadNumX *
-                                 NormalGemmConfig::kTileX),
-              CalBlockNum(m, NormalGemmConfig::kThreadNumY *
-                                 NormalGemmConfig::kTileY)},
-         dim3{NormalGemmConfig::kThreadNumX, NormalGemmConfig::kThreadNumY}, 0,
-         ThreadCudaContexts::GetContext().stream>>>(input, weight, dst, m, d, n,
-                                                    {d}, {d}, {n});
-}
 
 void gemm_row_major(const float *input, const float *weight, const float *bias,
                     float *dst, uint32_t m, uint32_t d, uint32_t n) {
@@ -503,21 +535,21 @@ void gemm_row_major_tl(const float *input, const float *weight,
                                                  out_d);
 }
 
-void gemm_row_major_l(const float *input, const float *weight,
-                      const float *bias, float *dst, uint32_t b, uint32_t q,
-                      uint32_t d, uint32_t n, uint32_t q_start,
-                      uint32_t q_end) {
+void gemm_row_major_sl(const float *input, const float *weight,
+                       const float *bias, float *dst, uint32_t b, uint32_t q,
+                       uint32_t d, uint32_t n, uint32_t q_start,
+                       uint32_t q_end) {
   TINY_LLM_CHECK(bias == nullptr);
   TINY_LLM_CHECK(q_start + q <= q_end);
   if (b == 0 || q == 0 || d == 0 || n == 0) {
     return;
   }
 
-  gemm_row_major_l_no_bias_kernel<<<dim3{CalBlockNum(n, kBlockSize * kTileX),
-                                         CalBlockNum((b * q),
-                                                     kBlockSize * kTileY)},
-                                    dim3{kBlockSize, kBlockSize}, 0,
-                                    ThreadCudaContexts::GetContext().stream>>>(
+  gemm_row_major_sl_no_bias_kernel<<<dim3{CalBlockNum(n, kBlockSize * kTileX),
+                                          CalBlockNum((b * q),
+                                                      kBlockSize * kTileY)},
+                                     dim3{kBlockSize, kBlockSize}, 0,
+                                     ThreadCudaContexts::GetContext().stream>>>(
       input, weight, dst, b, q, d, n, q_start, q_end);
 }
 // NOLINTEND(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)

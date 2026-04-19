@@ -226,8 +226,8 @@ TEST(CudaOps, GemmL) {
   }
 
   Tensor dst(target_dev, DataType::kFloat32, {b, q, n});
-  cuda::gemm_row_major_l(input.data<float>(), weight.data<float>(), nullptr,
-                         dst.data<float>(), b, q, d, n, q_start, q_end);
+  cuda::gemm_row_major_sl(input.data<float>(), weight.data<float>(), nullptr,
+                          dst.data<float>(), b, q, d, n, q_start, q_end);
   auto cpu_dst = dst.to({.type = DeviceType::kCpu});
 
   ThreadCudaContexts::Synchronize();

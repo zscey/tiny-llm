@@ -14,20 +14,6 @@ namespace tiny_llm::cuda {
  * @param d
  * @param n
  */
-void gemm(const float *input, const float *weight, const float *bias,
-          float *dst, uint32_t m, uint32_t d, uint32_t n);
-
-/**
- * @brief dst = matmul(input, weight) + bias
- *
- * @param input [m, d], continuous
- * @param weight [n, d], continuous
- * @param bias [n] or empty, continuous
- * @param dst [m, n], continuous
- * @param m
- * @param d
- * @param n
- */
 void gemm_row_major(const float *input, const float *weight, const float *bias,
                     float *dst, uint32_t m, uint32_t d, uint32_t n);
 
@@ -53,7 +39,7 @@ void gemm_row_major_lt(const float *input, const float *weight,
                        uint32_t q_start, uint32_t q_end);
 
 /**
- * @brief
+ * @brief Transpose + Linear
  *
  * @param input [b, h, q, d], continuous
  * @param weight [out_d, h * d], continuous
@@ -70,7 +56,7 @@ void gemm_row_major_tl(const float *input, const float *weight,
                        uint32_t q, uint32_t d, uint32_t out_d);
 
 /**
- * @brief
+ * @brief Slice + Linear
  *
  * @param input [b, q_end, d], use its slice [b, q_start: q_start + q, d] as the
  * actual input
@@ -84,7 +70,8 @@ void gemm_row_major_tl(const float *input, const float *weight,
  * @param q_start
  * @param q_end
  */
-void gemm_row_major_l(const float *input, const float *weight,
-                      const float *bias, float *dst, uint32_t b, uint32_t q,
-                      uint32_t d, uint32_t n, uint32_t q_start, uint32_t q_end);
+void gemm_row_major_sl(const float *input, const float *weight,
+                       const float *bias, float *dst, uint32_t b, uint32_t q,
+                       uint32_t d, uint32_t n, uint32_t q_start,
+                       uint32_t q_end);
 } // namespace tiny_llm::cuda
