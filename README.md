@@ -66,7 +66,7 @@ For more configuration options, use the help flag:
 
 ## Features
 
-* **Multi-Backend Architecture**: An extensible design aimed at supporting diverse compute backends (e.g., CUDA, CPU/AVX) through unified abstractions.
+* **Comprehensive Multi-Backend Support**: An extensible architecture delivering full-stack support—from high-performance operator kernels to optimized runtimes—across diverse compute backends (e.g., CUDA, CPU/AVX).
 * **Tensor Core Acceleration**: Deeply optimized kernels leveraging NVIDIA Tensor Cores for high-throughput matrix multiplications.
 * **Mixed Precision Support**: Native support for **FP16** (Half-precision) to reduce memory bandwidth bottlenecks and double the inference speed.
 * **State Serialization**: Support for efficient runtime serialization and deserialization, enabling fast state saving and loading of model contexts or weights.
