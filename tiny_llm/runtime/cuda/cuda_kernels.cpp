@@ -313,10 +313,10 @@ void SliceLinearKernel::execute(const void *const *inputs,
                                 void *const *outputs) const {
   const auto *bias_ptr =
       param.bias ? static_cast<const float *>(inputs[2]) : nullptr;
-  gemm_row_major_l(static_cast<const float *>(inputs[0]),
-                   static_cast<const float *>(inputs[1]), bias_ptr,
-                   static_cast<float *>(outputs[0]), batch, param.only_last_q,
-                   param.in_dim, param.out_dim, q_end - param.only_last_q,
-                   q_end);
+  gemm_row_major_sl(static_cast<const float *>(inputs[0]),
+                    static_cast<const float *>(inputs[1]), bias_ptr,
+                    static_cast<float *>(outputs[0]), batch, param.only_last_q,
+                    param.in_dim, param.out_dim, q_end - param.only_last_q,
+                    q_end);
 }
 } // namespace tiny_llm::cuda

@@ -1,7 +1,8 @@
-#include <cstddef>
-
+#include "cccl/cuda/warp"
+#include "cub/cub.cuh"
 #include "tiny_llm/common/log_and_excepts.hpp"
 #include "tiny_llm/ops/cuda/gemm.hpp"
+#include <cstddef>
 
 namespace tiny_llm::cuda {
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)
@@ -224,9 +225,9 @@ __global__ void gemm_row_major_tl_no_bias_kernel(const float *input,
   write_dst(&res[0][0], dst, b * q, out_d);
 }
 
-__device__ void fetch_input_l(const float *input, float *input_buffer,
-                              uint32_t col_block_idx, uint32_t b, uint32_t q,
-                              uint32_t d, uint32_t q_start, uint32_t q_end) {
+__device__ void fetch_input_sl(const float *input, float *input_buffer,
+                               uint32_t col_block_idx, uint32_t b, uint32_t q,
+                               uint32_t d, uint32_t q_start, uint32_t q_end) {
   auto buffer_col = (col_block_idx * kBlockSize) + threadIdx.x;
   for (uint32_t ty = 0; ty < kTileY; ++ty) {
     auto *buffer_data =
@@ -244,9 +245,9 @@ __device__ void fetch_input_l(const float *input, float *input_buffer,
 }
 
 __global__ void
-gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
-                                float *dst, uint32_t b, uint32_t q, uint32_t d,
-                                uint32_t n, uint32_t q_start, uint32_t q_end) {
+gemm_row_major_sl_no_bias_kernel(const float *input, const float *weight,
+                                 float *dst, uint32_t b, uint32_t q, uint32_t d,
+                                 uint32_t n, uint32_t q_start, uint32_t q_end) {
   __shared__ float input_buffer[kBlockSize][(kBlockSize * kTileY) + 1];
   __shared__ float weight_buffer[kBlockSize][(kBlockSize * kTileX) + 1];
   float res[kTileY][kTileX];
@@ -260,7 +261,7 @@ gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
 
   auto block_num = CalBlockNum(d, kBlockSize);
   for (uint32_t i = 0; i < block_num; ++i) {
-    fetch_input_l(input, &input_buffer[0][0], i, b, q, d, q_start, q_end);
+    fetch_input_sl(input, &input_buffer[0][0], i, b, q, d, q_start, q_end);
     fetch_weight(weight, &weight_buffer[0][0], i, n, d);
     __syncthreads();
 
@@ -283,12 +284,111 @@ gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
 
   write_dst(&res[0][0], dst, b * q, n);
 }
+
+namespace ty1 {
+constexpr uint32_t kWarpSize = 32;
+constexpr uint32_t kWarpNumPerBlock = 16;
+constexpr uint32_t kThreadNum = kWarpNumPerBlock * kWarpSize;
+
+// tl in the same pattern
+__global__ void gemm_row_major_no_bias_kernel(const float *input,
+                                              const float *weight, float *dst,
+                                              uint32_t m, uint32_t d,
+                                              uint32_t n) {
+  __shared__ typename ::cub::WarpReduce<float>::TempStorage
+      temp_storage[kWarpNumPerBlock];
+
+  auto cur_m = blockIdx.y;
+  auto cur_n = (blockIdx.x * kWarpNumPerBlock) + (threadIdx.x / kWarpSize);
+  if (cur_m < m && cur_n < n) {
+    const auto *cur_input = input + (static_cast<size_t>(cur_m) * d);
+    const auto *cur_weight = weight + (static_cast<size_t>(cur_n) * d);
+
+    float res{};
+    for (uint32_t i = threadIdx.x % kWarpSize; i < d; i += kWarpSize) {
+      res += cur_input[i] * cur_weight[i];
+    }
+
+    res = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
+              .Sum(res);
+
+    if (threadIdx.x % 32 == 0) {
+      dst[(cur_m * n) + cur_n] = res;
+    }
+  }
+}
+
+// q1
+__global__ void gemm_row_major_lt_no_bias_kernel(
+    const float *input, const float *weight, float *dst, uint32_t b, uint32_t d,
+    uint32_t out_head, uint32_t out_d, uint32_t q_start, uint32_t q_end) {
+  __shared__ typename ::cub::WarpReduce<float>::TempStorage
+      temp_storage[kWarpNumPerBlock];
+
+  auto cur_m = blockIdx.y;
+  auto cur_n = (blockIdx.x * kWarpNumPerBlock) + (threadIdx.x / kWarpSize);
+  auto cur_h = cur_n / out_d;
+  auto cur_d = cur_n % out_d;
+  if (cur_m < b && cur_h < out_head && cur_d < out_d) {
+    const auto *cur_input = input + (static_cast<size_t>(cur_m) * d);
+    const auto *cur_weight = weight + (static_cast<size_t>(cur_n) * d);
+
+    float res{};
+    for (uint32_t i = threadIdx.x % kWarpSize; i < d; i += kWarpSize) {
+      res += cur_input[i] * cur_weight[i];
+    }
+
+    res = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
+              .Sum(res);
+
+    if (threadIdx.x % 32 == 0) {
+      dst[(((((cur_m * out_head) + cur_h) * q_end) + q_start) * out_d) +
+          cur_d] = res;
+    }
+  }
+}
+
+// q1
+__global__ void
+gemm_row_major_sl_no_bias_kernel(const float *input, const float *weight,
+                                 float *dst, uint32_t b, uint32_t d, uint32_t n,
+                                 uint32_t q_start, uint32_t q_end) {
+  __shared__ typename ::cub::WarpReduce<float>::TempStorage
+      temp_storage[kWarpNumPerBlock];
+
+  auto cur_m = blockIdx.y;
+  auto cur_n = (blockIdx.x * kWarpNumPerBlock) + (threadIdx.x / kWarpSize);
+  if (cur_m < b && cur_n < n) {
+    const auto *cur_input =
+        input + (((static_cast<size_t>(cur_m) * q_end) + q_start) * d);
+    const auto *cur_weight = weight + (static_cast<size_t>(cur_n) * d);
+
+    float res{};
+    for (uint32_t i = threadIdx.x % kWarpSize; i < d; i += kWarpSize) {
+      res += cur_input[i] * cur_weight[i];
+    }
+
+    res = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
+              .Sum(res);
+
+    if (threadIdx.x % 32 == 0) {
+      dst[(cur_m * n) + cur_n] = res;
+    }
+  }
+}
+} // namespace ty1
 } // namespace
 
 void gemm_row_major(const float *input, const float *weight, const float *bias,
                     float *dst, uint32_t m, uint32_t d, uint32_t n) {
   TINY_LLM_CHECK(bias == nullptr);
-  if (m * d * n == 0) {
+  if (m == 0 || d == 0 || n == 0) {
+    return;
+  }
+  if (m == 1) {
+    ty1::gemm_row_major_no_bias_kernel<<<
+        CalBlockNum(n, ty1::kWarpNumPerBlock), ty1::kThreadNum, 0,
+        ThreadCudaContexts::GetContext().stream>>>(input, weight, dst, m, d, n);
     return;
   }
 
@@ -305,7 +405,15 @@ void gemm_row_major_lt(const float *input, const float *weight,
                        uint32_t q_start, uint32_t q_end) {
   TINY_LLM_CHECK(bias == nullptr);
   TINY_LLM_CHECK(q_start + q <= q_end);
-  if (b * q * d * out_head * out_d == 0) {
+  if (b == 0 || q == 0 || d == 0 || out_head == 0 || out_d == 0) {
+    return;
+  }
+
+  if (q == 1) {
+    ty1::gemm_row_major_lt_no_bias_kernel<<<
+        dim3{CalBlockNum((out_head * out_d), ty1::kWarpNumPerBlock), b},
+        ty1::kThreadNum, 0, ThreadCudaContexts::GetContext().stream>>>(
+        input, weight, dst, b, d, out_head, out_d, q_start, q_end);
     return;
   }
 
@@ -321,7 +429,15 @@ void gemm_row_major_tl(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t h,
                        uint32_t q, uint32_t d, uint32_t out_d) {
   TINY_LLM_CHECK(bias == nullptr);
-  if (b * h * q * d * out_d == 0) {
+  if (b == 0 || h == 0 || q == 0 || d == 0 || out_d == 0) {
+    return;
+  }
+
+  if (q == 1) {
+    ty1::gemm_row_major_no_bias_kernel<<<
+        dim3{CalBlockNum(out_d, ty1::kWarpNumPerBlock), b}, ty1::kThreadNum, 0,
+        ThreadCudaContexts::GetContext().stream>>>(input, weight, dst, b, h * d,
+                                                   out_d);
     return;
   }
 
@@ -333,21 +449,29 @@ void gemm_row_major_tl(const float *input, const float *weight,
                                                  out_d);
 }
 
-void gemm_row_major_l(const float *input, const float *weight,
-                      const float *bias, float *dst, uint32_t b, uint32_t q,
-                      uint32_t d, uint32_t n, uint32_t q_start,
-                      uint32_t q_end) {
+void gemm_row_major_sl(const float *input, const float *weight,
+                       const float *bias, float *dst, uint32_t b, uint32_t q,
+                       uint32_t d, uint32_t n, uint32_t q_start,
+                       uint32_t q_end) {
   TINY_LLM_CHECK(bias == nullptr);
   TINY_LLM_CHECK(q_start + q <= q_end);
-  if (b * q * d * n == 0) {
+  if (b == 0 || q == 0 || d == 0 || n == 0) {
     return;
   }
 
-  gemm_row_major_l_no_bias_kernel<<<dim3{CalBlockNum(n, kBlockSize * kTileX),
-                                         CalBlockNum((b * q),
-                                                     kBlockSize * kTileY)},
-                                    dim3{kBlockSize, kBlockSize}, 0,
-                                    ThreadCudaContexts::GetContext().stream>>>(
+  if (q == 1) {
+    ty1::gemm_row_major_sl_no_bias_kernel<<<
+        dim3{CalBlockNum(n, ty1::kWarpNumPerBlock), b}, ty1::kThreadNum, 0,
+        ThreadCudaContexts::GetContext().stream>>>(input, weight, dst, b, d, n,
+                                                   q_start, q_end);
+    return;
+  }
+
+  gemm_row_major_sl_no_bias_kernel<<<dim3{CalBlockNum(n, kBlockSize * kTileX),
+                                          CalBlockNum((b * q),
+                                                      kBlockSize * kTileY)},
+                                     dim3{kBlockSize, kBlockSize}, 0,
+                                     ThreadCudaContexts::GetContext().stream>>>(
       input, weight, dst, b, q, d, n, q_start, q_end);
 }
 // NOLINTEND(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)

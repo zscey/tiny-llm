@@ -30,6 +30,8 @@ cuda_library(
     deps = [
         ":cuda_op_common",
         "//tiny_llm/common:log_and_excepts",
+        "@cuda//:cub",
+        "@cuda//:libcudacxx",
     ],
 )
 
