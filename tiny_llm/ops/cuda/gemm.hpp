@@ -14,6 +14,20 @@ namespace tiny_llm::cuda {
  * @param d
  * @param n
  */
+void gemm(const float *input, const float *weight, const float *bias,
+          float *dst, uint32_t m, uint32_t d, uint32_t n);
+
+/**
+ * @brief dst = matmul(input, weight) + bias
+ *
+ * @param input [m, d], continuous
+ * @param weight [n, d], continuous
+ * @param bias [n] or empty, continuous
+ * @param dst [m, n], continuous
+ * @param m
+ * @param d
+ * @param n
+ */
 void gemm_row_major(const float *input, const float *weight, const float *bias,
                     float *dst, uint32_t m, uint32_t d, uint32_t n);
 

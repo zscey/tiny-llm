@@ -6,6 +6,159 @@
 namespace tiny_llm::cuda {
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)
 namespace {
+template <typename T>
+concept GemmConfig =
+    requires {
+      { T::kBlockSize } -> std::convertible_to<uint32_t>;
+      { T::kThreadNumX } -> std::convertible_to<uint32_t>;
+      { T::kThreadNumY } -> std::convertible_to<uint32_t>;
+      { T::kTileX } -> std::convertible_to<uint32_t>;
+      { T::kTileY } -> std::convertible_to<uint32_t>;
+    } && (T::kBlockSize % 16 == 0) &&
+    ((T::kThreadNumX * T::kThreadNumY) % T::kBlockSize == 0);
+
+struct NormalGemmConfig {
+  static constexpr uint32_t kBlockSize = 16;
+  static constexpr uint32_t kThreadNumX = 16;
+  static constexpr uint32_t kThreadNumY = 16;
+  static constexpr uint32_t kTileX = 8;
+  static constexpr uint32_t kTileY = 8;
+};
+static_assert(GemmConfig<NormalGemmConfig>);
+
+template <typename T>
+concept Indexer = requires(const T &t, uint32_t row, uint32_t col) {
+  { t(row, col) } -> std::same_as<size_t>;
+};
+
+struct NDIndexer {
+  size_t stride;
+  __device__ __forceinline__ auto operator()(uint32_t row, uint32_t col) const
+      -> size_t {
+    return (row * stride) + col;
+  }
+};
+static_assert(Indexer<NDIndexer>);
+
+template <GemmConfig Config, Indexer FetchIndexer>
+__device__ void
+// NOLINTNEXTLINE(readability-non-const-parameter)
+fetch_input(const float *input, float *input_buffer, uint32_t col_idx,
+            uint32_t m, uint32_t d, FetchIndexer fetch_indexer) {
+  constexpr auto kBufferStep =
+      Config::kThreadNumX * Config::kThreadNumY / Config::kBlockSize;
+  constexpr auto kBlockDim = Config::kTileY * Config::kThreadNumY;
+  auto buffer_shift = (threadIdx.y * Config::kThreadNumX) + threadIdx.x;
+  for (auto buffer_row = buffer_shift / Config::kBlockSize,
+            buffer_col = buffer_shift % Config::kBlockSize;
+       buffer_row < kBlockDim; buffer_row += kBufferStep) {
+    auto &cur_elem =
+        input_buffer[(buffer_row * Config::kBlockSize) + buffer_col];
+    cur_elem = 0.F;
+
+    auto data_row = (blockIdx.y * kBlockDim) + buffer_row;
+    auto data_col = (col_idx * Config::kBlockSize) + buffer_col;
+    if (data_row < m && data_col < d) {
+      cur_elem = input[fetch_indexer(data_row, data_col)];
+    }
+  }
+}
+
+template <GemmConfig Config, Indexer FetchIndexer>
+__device__ __noinline__ void
+// NOLINTNEXTLINE(readability-non-const-parameter)
+fetch_weight(const float *weight, float *weight_buffer, uint32_t col_idx,
+             uint32_t n, uint32_t d, FetchIndexer fetch_indexer) {
+  constexpr auto kBufferStep =
+      Config::kThreadNumX * Config::kThreadNumY / Config::kBlockSize;
+  constexpr auto kBlockDim = Config::kTileX * Config::kThreadNumX;
+  auto buffer_shift = (threadIdx.y * Config::kThreadNumX) + threadIdx.x;
+  for (auto buffer_row = buffer_shift / Config::kBlockSize,
+            buffer_col = buffer_shift % Config::kBlockSize;
+       buffer_row < kBlockDim; buffer_row += kBufferStep) {
+    auto &cur_elem = weight_buffer[(buffer_row * Config::kBlockSize) +
+                                   buffer_row + buffer_col];
+    cur_elem = 0.F;
+
+    auto data_row = (blockIdx.x * kBlockDim) + buffer_row;
+    auto data_col = (col_idx * Config::kBlockSize) + buffer_col;
+    if (data_row < n && data_col < d) {
+      cur_elem = weight[fetch_indexer(data_row, data_col)];
+    }
+  }
+}
+
+template <uint32_t TileX, uint32_t TileY, uint32_t BlockSize,
+          Indexer WriteIndexer>
+// NOLINTNEXTLINE(readability-non-const-parameter)
+__device__ void write_dst(const float *res, float *dst, uint32_t m, uint32_t n,
+                          WriteIndexer write_indexer) {
+  for (uint32_t ty = 0; ty < TileY; ++ty) {
+    auto dst_row =
+        (blockIdx.y * BlockSize * TileY) + (ty * BlockSize) + threadIdx.y;
+    for (uint32_t tx = 0; tx < TileX; ++tx) {
+      auto dst_col =
+          (blockIdx.x * BlockSize * TileX) + (tx * BlockSize) + threadIdx.x;
+      if (dst_row < m && dst_col < n) {
+        dst[write_indexer(dst_row, dst_col)] = res[(ty * TileX) + tx];
+      }
+    }
+  }
+}
+
+template <GemmConfig Config, Indexer InputIndexer, Indexer WeightIndexer,
+          Indexer DstIndexer>
+__global__ void gemm_no_bias_kernel(const float *input, const float *weight,
+                                    float *dst, uint32_t m, uint32_t d,
+                                    uint32_t n, InputIndexer input_indexer,
+                                    WeightIndexer weight_indexer,
+                                    DstIndexer dst_indexer) {
+  constexpr uint32_t kBlockDimY = Config::kTileY * Config::kThreadNumY;
+  constexpr uint32_t kBlockDimX = Config::kTileX * Config::kThreadNumX;
+  __shared__ float input_buffer[kBlockDimY][Config::kBlockSize];
+  // The advantages of pad 1 outweigh the disadvantages
+  __shared__ float weight_buffer[kBlockDimX][Config::kBlockSize + 1];
+  float res[Config::kTileY][Config::kTileX];
+  float input_regs[Config::kTileY];
+  float weight_regs[Config::kTileX];
+  for (auto &re : res) {
+    for (float &r : re) {
+      r = 0.F;
+    }
+  }
+
+  auto block_num = CalBlockNum(d, Config::kBlockSize);
+  for (uint32_t i = 0; i < block_num; ++i) {
+    fetch_input<Config, InputIndexer>(input, &input_buffer[0][0], i, m, d,
+                                      input_indexer);
+    fetch_weight<Config, WeightIndexer>(weight, &weight_buffer[0][0], i, n, d,
+                                        weight_indexer);
+
+    __syncthreads();
+
+    for (uint32_t k = 0; k < Config::kBlockSize; ++k) {
+      for (uint32_t ty = 0; ty < Config::kTileY; ++ty) {
+        input_regs[ty] =
+            input_buffer[threadIdx.y + (ty * Config::kThreadNumY)][k];
+      }
+      for (uint32_t tx = 0; tx < Config::kTileX; ++tx) {
+        weight_regs[tx] =
+            weight_buffer[threadIdx.x + (tx * Config::kThreadNumX)][k];
+      }
+      for (uint32_t ty = 0; ty < Config::kTileY; ++ty) {
+        for (uint32_t tx = 0; tx < Config::kTileX; ++tx) {
+          res[ty][tx] += input_regs[ty] * weight_regs[tx];
+        }
+      }
+    }
+
+    __syncthreads();
+  }
+
+  write_dst<Config::kTileX, Config::kTileY, Config::kBlockSize, DstIndexer>(
+      &res[0][0], dst, m, n, dst_indexer);
+}
+
 constexpr uint32_t kBlockSize = 16;
 constexpr uint32_t kTileX = 8;
 constexpr uint32_t kTileY = 8;
@@ -284,6 +437,23 @@ gemm_row_major_l_no_bias_kernel(const float *input, const float *weight,
   write_dst(&res[0][0], dst, b * q, n);
 }
 } // namespace
+
+void gemm(const float *input, const float *weight, const float *bias,
+          float *dst, uint32_t m, uint32_t d, uint32_t n) {
+  TINY_LLM_CHECK(bias == nullptr);
+  if (m == 0 || d == 0 || n == 0) {
+    return;
+  }
+
+  gemm_no_bias_kernel<NormalGemmConfig, NDIndexer, NDIndexer, NDIndexer>
+      <<<dim3{CalBlockNum(n, NormalGemmConfig::kThreadNumX *
+                                 NormalGemmConfig::kTileX),
+              CalBlockNum(m, NormalGemmConfig::kThreadNumY *
+                                 NormalGemmConfig::kTileY)},
+         dim3{NormalGemmConfig::kThreadNumX, NormalGemmConfig::kThreadNumY}, 0,
+         ThreadCudaContexts::GetContext().stream>>>(input, weight, dst, m, d, n,
+                                                    {d}, {d}, {n});
+}
 
 void gemm_row_major(const float *input, const float *weight, const float *bias,
                     float *dst, uint32_t m, uint32_t d, uint32_t n) {
