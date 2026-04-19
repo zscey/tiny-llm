@@ -359,9 +359,9 @@ gemm_row_major_sl_no_bias_kernel(const float *input, const float *weight,
   auto cur_m = blockIdx.y;
   auto cur_n = (blockIdx.x * kWarpNumPerBlock) + (threadIdx.x / kWarpSize);
   if (cur_m < b && cur_n < n) {
-    const auto &cur_input =
+    const auto *cur_input =
         input + (((static_cast<size_t>(cur_m) * q_end) + q_start) * d);
-    const auto &cur_weight = weight + (static_cast<size_t>(cur_n) * d);
+    const auto *cur_weight = weight + (static_cast<size_t>(cur_n) * d);
 
     float res{};
     for (uint32_t i = threadIdx.x % kWarpSize; i < d; i += kWarpSize) {
