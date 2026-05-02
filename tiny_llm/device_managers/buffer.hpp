@@ -22,29 +22,19 @@ struct Device {
   DeviceId id{-1};
 };
 
-class IDeleter {
-public:
-  IDeleter() = default;
-
-  TINY_LLM_DELETE_COPY_MOVE(IDeleter);
-
-  virtual void cleanup(void *ptr) = 0;
-
-  virtual ~IDeleter() = default;
-};
+using DeleterFnPtr = void (*)(void *);
 
 class Buffer {
 private:
   void *ptr_{};
   std::size_t size_{};
   Device device_{};
-  std::unique_ptr<IDeleter> deleter_;
+  DeleterFnPtr deleter_{};
 
 public:
   Buffer() = default;
 
-  Buffer(void *ptr, std::size_t size, Device device,
-         std::unique_ptr<IDeleter> deleter = {});
+  Buffer(void *ptr, std::size_t size, Device device, DeleterFnPtr deleter = {});
 
   Buffer(const Buffer &) = delete;
 

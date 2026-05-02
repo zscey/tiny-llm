@@ -12,7 +12,7 @@ cc_library(
     }),
     deps = [
         "//tiny_llm/common",
-        "//tiny_llm/device_managers:buffer",
+        "//tiny_llm/device_managers:copy_data",
         "//tiny_llm/device_managers/cpu:cpu_allocator",
     ] + select({
         "//platforms/device:cuda": ["//tiny_llm/device_managers/cuda:cuda_allocator"],
