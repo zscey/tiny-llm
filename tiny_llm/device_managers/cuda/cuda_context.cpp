@@ -17,6 +17,11 @@ struct alignas(64) ContextResources {
   std::atomic_size_t pos{0};
   std::array<cudaStream_t, kStreamsPerDevice> stream_pool{};
 };
+
+void check_dev_id(int32_t dev_id, int32_t dev_num) {
+  TINY_LLM_CHECK(InvalidArgumentError, dev_id >= 0);
+  TINY_LLM_CHECK(InvalidArgumentError, dev_id < dev_num);
+}
 } // namespace
 
 class CudaContextAllocator::Impl {
@@ -54,8 +59,10 @@ auto CudaContextAllocator::CreateCudaContext(int32_t dev_id) -> CudaContext {
   if (dev_id < 0) {
     TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
   }
+  auto &instance = Instance();
+  check_dev_id(dev_id, static_cast<int32_t>(instance.impl_->resources.size()));
 
-  auto &cur_resource = Instance().impl_->resources.at(dev_id);
+  auto &cur_resource = instance.impl_->resources.at(dev_id);
   auto cur_pos = cur_resource->pos.load(std::memory_order_relaxed);
   auto next_pos = (cur_pos + 1) % kStreamsPerDevice;
   while (!cur_resource->pos.compare_exchange_weak(cur_pos, next_pos,
@@ -88,10 +95,8 @@ auto ThreadCudaContexts::ThreadInstance() -> ThreadCudaContexts & {
 
 void ThreadCudaContexts::Push(CudaContext cuda_context) {
   auto &instance = ThreadInstance();
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, 0 <= cuda_context.id);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 static_cast<size_t>(cuda_context.id) <
-                     instance.impl_->contexts.size());
+  check_dev_id(cuda_context.id,
+               static_cast<int32_t>(instance.impl_->contexts.size()));
 
   instance.impl_->contexts.at(cuda_context.id).push(cuda_context);
 }
@@ -101,6 +106,7 @@ void ThreadCudaContexts::Pop(int32_t dev_id) {
   if (dev_id < 0) {
     TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
   }
+  check_dev_id(dev_id, static_cast<int32_t>(instance.impl_->contexts.size()));
 
   auto &cur_contexts = instance.impl_->contexts.at(dev_id);
   if (!cur_contexts.empty()) {
