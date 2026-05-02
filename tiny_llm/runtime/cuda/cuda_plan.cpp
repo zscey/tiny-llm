@@ -1,5 +1,6 @@
 #include "tiny_llm/runtime/cuda/cuda_plan.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/utils/visitor.hpp"
 #include <algorithm>
 #include <iterator>
@@ -44,7 +45,6 @@ enum class Status : std::uint8_t {
   kBlack,
 };
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 auto topological_order(const Graph &graph) -> std::vector<uint32_t> {
   std::vector<uint32_t> res;
   res.reserve(graph.nodes.size());
@@ -69,7 +69,7 @@ auto topological_order(const Graph &graph) -> std::vector<uint32_t> {
             if (status.at(next_node_id) == Status::kWhite) {
               stack.push(next_node_id);
             } else if (status.at(next_node_id) == Status::kGray) {
-              TINY_LLM_THROW_ERROR(std::runtime_error, "Cycle in graph.");
+              TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError, "Cycle in graph.");
             }
           }
         }
@@ -102,14 +102,14 @@ auto create_task(CudaPlan &plan, std::unordered_set<uint32_t> &cache,
                  const std::vector<uint32_t> &nodes_mapping) -> void {
   const auto &[node_name, graph_node] = graph.nodes.at(node_id).value();
   if (graph_node.input_tensors.size() != input_num(graph_node.param)) {
-    TINY_LLM_THROW_ERROR(std::runtime_error,
+    TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
                          "The number of inputs for node [{}] is incorrect; it "
                          "should be {}, but is currently {}.",
                          node_name, input_num(graph_node.param),
                          graph_node.input_tensors.size());
   }
   if (graph_node.output_tensors.size() != output_num(graph_node.param)) {
-    TINY_LLM_THROW_ERROR(std::runtime_error,
+    TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
                          "The number of outputs for node [{}] is incorrect; it "
                          "should be {}, but is currently {}.",
                          node_name, output_num(graph_node.param),
@@ -164,6 +164,7 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id) {
       if (graph.input_names.contains(tensor_name)) {
         // is input
         TINY_LLM_CHECK(
+            tiny_llm::RuntimeError,
             plan.plan_config.named_shape_ranges.contains(tensor_name));
         plan_tensor_desc.cur_shape =
             plan.plan_config.named_shape_ranges.at(tensor_name).max_shape;
@@ -172,8 +173,10 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id) {
             .emplace_back(task_id, input_id);
       } else {
         // is initializer
-        TINY_LLM_CHECK(std::ranges::all_of(
-            graph_tensor_info.shape, [](auto s) -> auto { return s > 0; }));
+        TINY_LLM_CHECK(
+            tiny_llm::RuntimeError,
+            std::ranges::all_of(graph_tensor_info.shape,
+                                [](auto s) -> auto { return s > 0; }));
         plan_tensor_desc.cur_shape =
             vector_convert<int64_t, size_t>(graph_tensor_info.shape);
       }
@@ -211,11 +214,13 @@ auto bind_descs(CudaPlan &plan, const Graph &graph, uint32_t node_id) {
 
 auto create_cuda_plan(const Graph &graph, PlanConfig plan_config) -> CudaPlan {
   for (const auto &[_, shape_range] : plan_config.named_shape_ranges) {
-    TINY_LLM_CHECK(shape_range.min_shape.size() ==
-                   shape_range.max_shape.size());
+    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                   shape_range.min_shape.size() ==
+                       shape_range.max_shape.size());
     for (size_t i = 0, i_end = shape_range.min_shape.size(); i < i_end; ++i) {
-      TINY_LLM_CHECK(shape_range.min_shape.at(i) <=
-                     shape_range.max_shape.at(i));
+      TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                     shape_range.min_shape.at(i) <=
+                         shape_range.max_shape.at(i));
     }
   }
   auto topo_order_nodes = topological_order(graph);

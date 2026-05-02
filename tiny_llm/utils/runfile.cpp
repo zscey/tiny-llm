@@ -1,5 +1,6 @@
 #include "tiny_llm/utils/runfile.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tools/cpp/runfiles/runfiles.h"
 #include <memory>
 #include <mutex>
@@ -15,13 +16,13 @@ void BazelRunfile::Initialize(const std::string &exec_path) {
   static std::once_flag flag;
   std::call_once(flag, [&exec_path]() -> void {
     *runfile_env() = bazel::tools::cpp::runfiles::Runfiles::Create(exec_path);
-    TINY_LLM_CHECK(*runfile_env());
+    TINY_LLM_CHECK(tiny_llm::RuntimeError, *runfile_env());
   });
 }
 
 auto BazelRunfile::RLocation(const std::string &location) -> std::string {
   auto res = (*runfile_env())->Rlocation(location);
-  TINY_LLM_CHECK(!res.empty());
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, !res.empty());
   return res;
 }
 } // namespace tiny_llm::utils

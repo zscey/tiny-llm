@@ -11,7 +11,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/device_managers:buffer",
         "//tiny_llm/device_managers/cpu:cpu_allocator",
     ] + select({

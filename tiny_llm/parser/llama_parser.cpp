@@ -1,5 +1,6 @@
 #include "tiny_llm/parser/llama_parser.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include <array>
 
 namespace tiny_llm {
@@ -10,8 +11,9 @@ auto llama_add_node(
     std::vector<std::string>
         extern_inputs) // NOLINT(performance-unnecessary-value-param)
     -> std::array<std::string, output_num<T>()> {
-  TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<T>());
-  TINY_LLM_CHECK(output_num<T>() == 1);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 extern_inputs.size() == extern_input_num<T>());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, output_num<T>() == 1);
   std::array<std::string, output_num<T>()> output_names{node_name + ".out"};
 
   g.add_node(node_name,
@@ -25,8 +27,10 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     const EmbeddingParam &param,
                     std::vector<std::string> extern_inputs)
     -> std::array<std::string, output_num<EmbeddingParam>()> {
-  TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<EmbeddingParam>());
-  TINY_LLM_CHECK(output_num<EmbeddingParam>() == 1);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 extern_inputs.size() == extern_input_num<EmbeddingParam>());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 output_num<EmbeddingParam>() == 1);
   std::array<std::string, output_num<EmbeddingParam>()> output_names{node_name +
                                                                      ".out"};
 
@@ -45,8 +49,9 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     const RopeParam &param,
                     const std::vector<std::string> &extern_inputs)
     -> std::array<std::string, output_num<RopeParam>()> {
-  TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<RopeParam>());
-  TINY_LLM_CHECK(output_num<RopeParam>() == 2);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 extern_inputs.size() == extern_input_num<RopeParam>());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, output_num<RopeParam>() == 2);
   std::array<std::string, output_num<RopeParam>()> output_names{
       node_name + ".cos", node_name + ".sin"};
 
@@ -60,8 +65,10 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     const RMSNormParam &param,
                     std::vector<std::string> extern_inputs)
     -> std::array<std::string, output_num<RMSNormParam>()> {
-  TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<RMSNormParam>());
-  TINY_LLM_CHECK(output_num<RMSNormParam>() == 1);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 extern_inputs.size() == extern_input_num<RMSNormParam>());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 output_num<RMSNormParam>() == 1);
   std::array<std::string, output_num<RMSNormParam>()> output_names{node_name +
                                                                    ".out"};
 
@@ -79,9 +86,11 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     const LinearParam &param,
                     std::vector<std::string> extern_inputs)
     -> std::array<std::string, output_num<LinearParam>()> {
-  TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<LinearParam>());
-  TINY_LLM_CHECK(param.bias == false);
-  TINY_LLM_CHECK(output_num<LinearParam>() == 1);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 extern_inputs.size() == extern_input_num<LinearParam>());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, param.bias == false);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 output_num<LinearParam>() == 1);
   std::array<std::string, output_num<LinearParam>()> output_names{node_name +
                                                                   ".out"};
 
@@ -101,10 +110,12 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     std::vector<std::string> extern_inputs)
     -> std::array<std::string, output_num<CausalAttentionParam>()> {
   // hidden_state, cos, sin, pos_ids
-  TINY_LLM_CHECK(extern_inputs.size() ==
-                 extern_input_num<CausalAttentionParam>());
-  TINY_LLM_CHECK(param.bias == false);
-  TINY_LLM_CHECK(output_num<CausalAttentionParam>() == 1);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 extern_inputs.size() ==
+                     extern_input_num<CausalAttentionParam>());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, param.bias == false);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 output_num<CausalAttentionParam>() == 1);
   std::array<std::string, output_num<CausalAttentionParam>()> output_names{
       node_name + ".out"};
 
@@ -135,9 +146,11 @@ auto llama_add_node(Graph &g, const std::string &node_name,
                     const SliceLinearParam &param,
                     std::vector<std::string> extern_inputs)
     -> std::array<std::string, output_num<SliceLinearParam>()> {
-  TINY_LLM_CHECK(extern_inputs.size() == extern_input_num<SliceLinearParam>());
-  TINY_LLM_CHECK(param.bias == false);
-  TINY_LLM_CHECK(output_num<SliceLinearParam>() == 1);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 extern_inputs.size() == extern_input_num<SliceLinearParam>());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, param.bias == false);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 output_num<SliceLinearParam>() == 1);
   std::array<std::string, output_num<SliceLinearParam>()> output_names{
       node_name + ".out"};
 
@@ -154,9 +167,12 @@ auto llama_add_node(Graph &g, const std::string &node_name,
 } // namespace
 
 auto llama_parser(const nlohmann::json &config) -> Graph {
-  TINY_LLM_CHECK(config["attention_bias"].get<bool>() == false);
-  TINY_LLM_CHECK(config["rope_scaling"].is_null());
-  TINY_LLM_CHECK(config["hidden_act"].get<std::string>() == "silu");
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 config["attention_bias"].get<bool>() == false);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 config["rope_scaling"].is_null());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 config["hidden_act"].get<std::string>() == "silu");
   auto hidden_size = config["hidden_size"].get<uint32_t>();
   auto q_head = config["num_attention_heads"].get<uint32_t>();
   auto kv_head = config["num_key_value_heads"].get<uint32_t>();

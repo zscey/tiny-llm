@@ -1,5 +1,7 @@
 #include "tiny_llm/device_managers/cuda/cuda_context.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/cuda_checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_device_guard.hpp"
 #include <array>
 #include <atomic>
@@ -29,7 +31,7 @@ auto CudaContextAllocator::Instance() -> CudaContextAllocator & {
 
 CudaContextAllocator::CudaContextAllocator() : impl_(std::make_unique<Impl>()) {
   int32_t dev_num{};
-  TINY_LLM_CUDA_CHECK(cudaGetDeviceCount(&dev_num));
+  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDeviceCount(&dev_num));
 
   CudaDeviceSwitchGuard guard(-1);
 
@@ -38,10 +40,10 @@ CudaContextAllocator::CudaContextAllocator() : impl_(std::make_unique<Impl>()) {
   for (int32_t dev_id = 0; dev_id < dev_num; ++dev_id) {
     impl_->stream_pos[dev_id].pos = 0;
 
-    TINY_LLM_CUDA_CHECK(cudaSetDevice(dev_id));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaSetDevice(dev_id));
     auto &streams = impl_->stream_pool.at(dev_id);
     for (auto &stream : streams) {
-      TINY_LLM_CUDA_CHECK(cudaStreamCreate(&stream));
+      TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaStreamCreate(&stream));
     }
   }
 }
@@ -50,7 +52,7 @@ CudaContextAllocator::~CudaContextAllocator() noexcept = default;
 
 auto CudaContextAllocator::CreateCudaContext(int32_t dev_id) -> CudaContext {
   if (dev_id < 0) {
-    TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
   }
 
   auto &cuda_stream_allocator = Instance();
@@ -77,7 +79,7 @@ public:
 
 ThreadCudaContexts::ThreadCudaContexts() : impl_(std::make_unique<Impl>()) {
   int32_t dev_num{};
-  TINY_LLM_CUDA_CHECK(cudaGetDeviceCount(&dev_num));
+  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDeviceCount(&dev_num));
 
   impl_->contexts.resize(dev_num);
 };
@@ -89,9 +91,10 @@ auto ThreadCudaContexts::ThreadInstance() -> ThreadCudaContexts & {
 
 void ThreadCudaContexts::Push(CudaContext cuda_context) {
   auto &instance = ThreadInstance();
-  TINY_LLM_CHECK(0 <= cuda_context.id);
-  TINY_LLM_CHECK(static_cast<size_t>(cuda_context.id) <
-                 instance.impl_->contexts.size());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, 0 <= cuda_context.id);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 static_cast<size_t>(cuda_context.id) <
+                     instance.impl_->contexts.size());
 
   instance.impl_->contexts.at(cuda_context.id).push(cuda_context);
 }
@@ -99,7 +102,7 @@ void ThreadCudaContexts::Push(CudaContext cuda_context) {
 void ThreadCudaContexts::Pop(int32_t dev_id) {
   auto &instance = ThreadInstance();
   if (dev_id < 0) {
-    TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
   }
 
   auto &cur_contexts = instance.impl_->contexts.at(dev_id);
@@ -111,7 +114,7 @@ void ThreadCudaContexts::Pop(int32_t dev_id) {
 auto ThreadCudaContexts::GetContext() -> CudaContext {
   auto &instance = ThreadInstance();
   int32_t dev_id{};
-  TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
 
   auto &cur_contexts = instance.impl_->contexts.at(dev_id);
   if (cur_contexts.empty()) {
@@ -123,16 +126,17 @@ auto ThreadCudaContexts::GetContext() -> CudaContext {
 
 void ThreadCudaContexts::Synchronize() {
   int32_t dev_id{};
-  TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
 
   auto &cur_contexts = ThreadInstance().impl_->contexts.at(dev_id);
   if (!cur_contexts.empty()) {
-    TINY_LLM_CUDA_CHECK(cudaStreamSynchronize(cur_contexts.top().stream));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError,
+                        cudaStreamSynchronize(cur_contexts.top().stream));
   }
 }
 
 void ThreadCudaContexts::SynchronizeDevice() {
-  TINY_LLM_CUDA_CHECK(cudaDeviceSynchronize());
+  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaDeviceSynchronize());
 }
 
 // ========================== ThreadCudaContextsGuard ==========================

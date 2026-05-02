@@ -1,5 +1,6 @@
 #include "tiny_llm/runtime/cuda/cuda_kernels.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/ops/cuda/arithmetic.hpp"
 #include "tiny_llm/ops/cuda/embedding.hpp"
 #include "tiny_llm/ops/cuda/flash_attention.hpp"
@@ -13,15 +14,16 @@ namespace tiny_llm::cuda {
 namespace {
 void check_desc_dtype_and_shape(const TensorDesc &desc, DataType dtype,
                                 const std::vector<size_t> &cur_shape) {
-  TINY_LLM_CHECK(desc.dtype == dtype);
-  TINY_LLM_CHECK(desc.cur_shape == cur_shape);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, desc.dtype == dtype);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, desc.cur_shape == cur_shape);
 }
 
 void check_desc_dtype_and_shape(const TensorDesc &desc, DataType dtype,
                                 size_t last_dim) {
-  TINY_LLM_CHECK(desc.dtype == dtype);
-  TINY_LLM_CHECK(!desc.cur_shape.empty());
-  TINY_LLM_CHECK(desc.cur_shape.back() == last_dim);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, desc.dtype == dtype);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, !desc.cur_shape.empty());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 desc.cur_shape.back() == last_dim);
 }
 
 auto element_num(const std::vector<size_t> &shape) -> size_t {
@@ -36,7 +38,8 @@ auto element_num(const std::vector<size_t> &shape) -> size_t {
 void SiLUKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
                                    TensorDesc *const *output_descs) {
   const auto *input_desc = input_descs[0];
-  TINY_LLM_CHECK(input_desc->dtype == DataType::kFloat32);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 input_desc->dtype == DataType::kFloat32);
 
   auto *output_desc = output_descs[0];
   output_desc->dtype = input_desc->dtype;
@@ -53,7 +56,8 @@ void SiLUKernel::execute(const void *const *inputs,
 void EmbeddingKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
                                         TensorDesc *const *output_descs) {
   const auto *input_desc = input_descs[0];
-  TINY_LLM_CHECK(input_desc->dtype == DataType::kUint32);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 input_desc->dtype == DataType::kUint32);
   const auto *weight_desc = input_descs[1];
   check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
                              {param.num_embeddings, param.hidden_size});
@@ -118,8 +122,9 @@ void AddKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
                                   TensorDesc *const *output_descs) {
   const auto *left_desc = input_descs[0];
   const auto *right_desc = input_descs[1];
-  TINY_LLM_CHECK(left_desc->dtype == right_desc->dtype);
-  TINY_LLM_CHECK(left_desc->cur_shape == right_desc->cur_shape);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, left_desc->dtype == right_desc->dtype);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 left_desc->cur_shape == right_desc->cur_shape);
 
   auto *output_desc = output_descs[0];
   output_desc->dtype = left_desc->dtype;
@@ -138,8 +143,9 @@ void MulKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
                                   TensorDesc *const *output_descs) {
   const auto *left_desc = input_descs[0];
   const auto *right_desc = input_descs[1];
-  TINY_LLM_CHECK(left_desc->dtype == right_desc->dtype);
-  TINY_LLM_CHECK(left_desc->cur_shape == right_desc->cur_shape);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, left_desc->dtype == right_desc->dtype);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 left_desc->cur_shape == right_desc->cur_shape);
 
   auto *output_desc = output_descs[0];
   output_desc->dtype = left_desc->dtype;
@@ -192,10 +198,10 @@ void CausalAttentionKernel::dtype_shape_infer(
   auto kv_dim = static_cast<size_t>(param.kv_head) * param.head_dim;
 
   const auto *h_desc = input_descs[0];
-  TINY_LLM_CHECK(h_desc->cur_shape.size() == 3);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, h_desc->cur_shape.size() == 3);
   check_desc_dtype_and_shape(*h_desc, DataType::kFloat32, q_dim);
   const auto *cos_desc = input_descs[1];
-  TINY_LLM_CHECK(cos_desc->cur_shape.size() == 2);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, cos_desc->cur_shape.size() == 2);
   check_desc_dtype_and_shape(*cos_desc, DataType::kFloat32, param.head_dim / 2);
   const auto *sin_desc = input_descs[2];
   check_desc_dtype_and_shape(*sin_desc, DataType::kFloat32,
@@ -231,10 +237,10 @@ void CausalAttentionKernel::dtype_shape_infer(
 
   batch = h_desc->cur_shape.at(0);
   // attention kernel with mask is not implemented, thus the batch must be 1.
-  TINY_LLM_CHECK(batch == 1);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, batch == 1);
   seq_len = h_desc->cur_shape.at(1);
   if (!is_prefill) {
-    TINY_LLM_CHECK(seq_len == 1);
+    TINY_LLM_CHECK(tiny_llm::RuntimeError, seq_len == 1);
   }
   hidden_size = h_desc->cur_shape.at(2);
 }
@@ -243,7 +249,7 @@ void CausalAttentionKernel::execute(const void *const *inputs,
                                     void *const *outputs) {
   cache_length = is_prefill ? 0 : cache_length;
   auto new_cache_length = seq_len + cache_length;
-  TINY_LLM_CHECK(new_cache_length <= param.max_len);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, new_cache_length <= param.max_len);
 
   const auto *hidden_state = static_cast<const float *>(inputs[0]);
   const auto *cos = static_cast<const float *>(inputs[1]);
@@ -290,7 +296,7 @@ void CausalAttentionKernel::execute(const void *const *inputs,
 void SliceLinearKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
                                           TensorDesc *const *output_descs) {
   const auto *input_desc = input_descs[0];
-  TINY_LLM_CHECK(input_desc->cur_shape.size() == 3);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, input_desc->cur_shape.size() == 3);
   check_desc_dtype_and_shape(*input_desc, DataType::kFloat32, param.in_dim);
   const auto *weight_desc = input_descs[1];
   check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
@@ -305,7 +311,7 @@ void SliceLinearKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
   output_desc->dtype = input_desc->dtype;
   batch = static_cast<uint32_t>(input_desc->cur_shape[0]);
   q_end = static_cast<uint32_t>(input_desc->cur_shape[1]);
-  TINY_LLM_CHECK(q_end >= param.only_last_q);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, q_end >= param.only_last_q);
   output_desc->cur_shape = {batch, param.only_last_q, param.out_dim};
 }
 

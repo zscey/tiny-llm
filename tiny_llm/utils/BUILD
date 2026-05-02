@@ -7,7 +7,7 @@ cc_library(
     srcs = ["runfile.cpp"],
     hdrs = ["runfile.hpp"],
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "@bazel_tools//tools/cpp/runfiles",
     ],
 )

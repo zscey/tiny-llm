@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cuda_runtime.h"
-#include "tiny_llm/common/common_macros.hpp"
+#include "tiny_llm/common/construct_macros.hpp"
 #include "tiny_llm/device_managers/buffer.hpp"
 #include <memory>
 

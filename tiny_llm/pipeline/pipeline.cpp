@@ -1,5 +1,6 @@
 #include "tiny_llm/pipeline/pipeline.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/logit_processors/argmax_processor.hpp"
 #include "tiny_llm/logit_processors/sample_processors.hpp"
 #include "tiny_llm/logit_processors/sort_processors.hpp"
@@ -25,11 +26,14 @@ auto all_zero(const Tensor &unfinished) -> bool {
 } // namespace
 
 Pipeline::Pipeline(const std::string &model_path, PipelineConfig config) {
-  TINY_LLM_CHECK(config.model_type == ModelType::kTinyLlama);
-  TINY_LLM_CHECK(config.dtype == DataType::kFloat32);
-  TINY_LLM_CHECK(config.device.type == DeviceType::kCuda);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 config.model_type == ModelType::kTinyLlama);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 config.dtype == DataType::kFloat32);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 config.device.type == DeviceType::kCuda);
   // TODO(): support batch > 1
-  TINY_LLM_CHECK(config.batch == 1);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, config.batch == 1);
 
   std::filesystem::path model_root(model_path);
 
@@ -40,7 +44,8 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config) {
   // runtime_
   std::ifstream f(model_root / "config.json");
   auto json = nlohmann::json::parse(f);
-  TINY_LLM_CHECK((!json["torch_dtype"].is_null() &&
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 (!json["torch_dtype"].is_null() &&
                   json["torch_dtype"].get<std::string>() == "float32"));
   f.close();
   auto plan = cuda::create_cuda_plan(
@@ -91,8 +96,9 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
                      uint32_t top_k, float top_p) const
     -> std::vector<std::string> {
   // TODO(): support batch > 1
-  TINY_LLM_CHECK(prompts.size() ==
-                 static_cast<size_t>(unfinished_->shape().at(0)));
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 prompts.size() ==
+                     static_cast<size_t>(unfinished_->shape().at(0)));
 
   auto tokenize_res = tokenizer_->encode(prompts.at(0), true);
   {

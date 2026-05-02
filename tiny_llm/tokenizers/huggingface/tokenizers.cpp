@@ -1,5 +1,6 @@
 #include "tiny_llm/tokenizers/huggingface/tokenizers.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 
 namespace tiny_llm {
 struct TokenizerEncodeResult {
@@ -29,9 +30,9 @@ auto tokenizer_vocab_size(TokenizerHandle *handle) -> size_t;
 
 namespace tiny_llm {
 HuggingfaceTokenizer::HuggingfaceTokenizer(const std::string &path) {
-  TINY_LLM_CHECK(!path.empty());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, !path.empty());
   handle_ = tokenizer_init(path.c_str());
-  TINY_LLM_CHECK(handle_);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, handle_);
 }
 
 HuggingfaceTokenizer::HuggingfaceTokenizer(

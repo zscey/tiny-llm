@@ -1,5 +1,6 @@
 #include "tiny_llm/runtime/cuda/cuda_runtime.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
 #include "tiny_llm/runtime/greedy_memory_planer.hpp"
 #include <algorithm>
@@ -125,7 +126,7 @@ struct SizeCalculator {
     auto &to_relation = relations.at(desc_ptr_to_id.at(to_desc));
     if (from_desc != nullptr) {
       auto &from_relation = relations.at(desc_ptr_to_id.at(from_desc));
-      TINY_LLM_CHECK(!from_relation.exclusive);
+      TINY_LLM_CHECK(tiny_llm::RuntimeError, !from_relation.exclusive);
       from_relation.dependence = 0;
       to_relation.v_block = from_relation.v_block;
     } else {
@@ -271,16 +272,18 @@ struct SizeCalculator {
       if (std::holds_alternative<CausalAttentionKernel>(task.kernel)) {
         auto &cur_kernel = std::get<CausalAttentionKernel>(task.kernel);
         const auto &inner_relation = inner_relations.at(&cur_kernel);
-        TINY_LLM_CHECK(inner_relation.at(0).exclusive == false);
+        TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                       inner_relation.at(0).exclusive == false);
         cur_kernel.q_cache = reinterpret_cast<float *>(
             ptrs.dynamic_ptr + inner_relation.at(0).v_block.offset);
-        TINY_LLM_CHECK(inner_relation.at(1).exclusive);
+        TINY_LLM_CHECK(tiny_llm::RuntimeError, inner_relation.at(1).exclusive);
         cur_kernel.k_cache = reinterpret_cast<float *>(
             ptrs.static_ptr + inner_relation.at(1).v_block.offset);
-        TINY_LLM_CHECK(inner_relation.at(2).exclusive);
+        TINY_LLM_CHECK(tiny_llm::RuntimeError, inner_relation.at(2).exclusive);
         cur_kernel.v_cache = reinterpret_cast<float *>(
             ptrs.static_ptr + inner_relation.at(2).v_block.offset);
-        TINY_LLM_CHECK(inner_relation.at(3).exclusive == false);
+        TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                       inner_relation.at(3).exclusive == false);
         cur_kernel.o_cache = reinterpret_cast<float *>(
             ptrs.dynamic_ptr + inner_relation.at(3).v_block.offset);
       }
@@ -306,7 +309,7 @@ struct WeightAssigner {
 
   void check_and_copy_weight(const TensorDesc *desc, const void *data_ptr,
                              const std::vector<size_t> &target_shape) const {
-    TINY_LLM_CHECK(desc->cur_shape == target_shape);
+    TINY_LLM_CHECK(tiny_llm::RuntimeError, desc->cur_shape == target_shape);
     auto dst_tensor = desc_to_tensor(
         {.type = DeviceType::kCuda, .id = ThreadCudaContexts::GetContext().id},
         *desc, data_ptr);
@@ -400,7 +403,7 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
   // input ptrs
   for (const auto &[name, info] : plan_.input_infos) {
     const auto &task_ios = info.second;
-    TINY_LLM_CHECK(!task_ios.empty());
+    TINY_LLM_CHECK(tiny_llm::RuntimeError, !task_ios.empty());
     const auto &task_io = task_ios.at(0);
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     input_ptrs_[name] = const_cast<void *>(
@@ -433,29 +436,36 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
 
 void check_input(const CudaRuntime &cuda_runtime, const std::string &name,
                  const Tensor &tensor) {
-  TINY_LLM_CHECK(cuda_runtime.plan_.input_infos.contains(name));
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 cuda_runtime.plan_.input_infos.contains(name));
   TINY_LLM_CHECK(
+      tiny_llm::RuntimeError,
       cuda_runtime.plan_.plan_config.named_shape_ranges.contains(name));
-  TINY_LLM_CHECK(cuda_runtime.input_ptrs_.contains(name));
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 cuda_runtime.input_ptrs_.contains(name));
 
   const auto &desc = cuda_runtime.plan_.tensor_descs.at(
       cuda_runtime.plan_.input_infos.at(name).first);
-  TINY_LLM_CHECK(desc.dtype == tensor.dtype());
-  TINY_LLM_CHECK(desc.cur_shape.size() == tensor.shape().size());
-  TINY_LLM_CHECK(tensor.is_continuous());
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, desc.dtype == tensor.dtype());
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 desc.cur_shape.size() == tensor.shape().size());
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, tensor.is_continuous());
   const auto &min_shape =
       cuda_runtime.plan_.plan_config.named_shape_ranges.at(name).min_shape;
   for (size_t i = 0, i_end = desc.cur_shape.size(); i < i_end; ++i) {
-    TINY_LLM_CHECK(static_cast<size_t>(tensor.shape().at(i)) <=
-                   desc.max_shape.at(i));
-    TINY_LLM_CHECK(static_cast<size_t>(tensor.shape().at(i)) >=
-                   min_shape.at(i));
+    TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                   static_cast<size_t>(tensor.shape().at(i)) <=
+                       desc.max_shape.at(i));
+    TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                   static_cast<size_t>(tensor.shape().at(i)) >=
+                       min_shape.at(i));
   }
 }
 
 void CudaRuntime::bind_input(const std::string &name, const Tensor &tensor) {
-  TINY_LLM_CHECK(tensor.device().type == DeviceType::kCuda);
-  TINY_LLM_CHECK(tensor.device().id == ctx_.id);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 tensor.device().type == DeviceType::kCuda);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, tensor.device().id == ctx_.id);
   check_input(*this, name, tensor);
 
   auto &[desc_id, task_ios] = plan_.input_infos.at(name);
@@ -470,7 +480,8 @@ void CudaRuntime::cpu_tensor_copy_to_input(const std::string &name,
                                            const Tensor &tensor) {
   ThreadCudaContextsGuard guard(ctx_);
 
-  TINY_LLM_CHECK((tensor.device().type == DeviceType::kCudaHost ||
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 (tensor.device().type == DeviceType::kCudaHost ||
                   tensor.device().type == DeviceType::kCpu));
   check_input(*this, name, tensor);
 
@@ -493,13 +504,14 @@ void CudaRuntime::output_copy_to_cpu_tensor(const std::string &name,
                                             Tensor &tensor) const {
   ThreadCudaContextsGuard guard(ctx_);
 
-  TINY_LLM_CHECK((tensor.device().type == DeviceType::kCudaHost ||
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 (tensor.device().type == DeviceType::kCudaHost ||
                   tensor.device().type == DeviceType::kCpu));
-  TINY_LLM_CHECK(plan_.output_infos.contains(name));
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, plan_.output_infos.contains(name));
 
   const auto &[desc_id, task_io] = plan_.output_infos.at(name);
   const auto desc = plan_.tensor_descs.at(desc_id);
-  TINY_LLM_CHECK(desc.dtype == tensor.dtype());
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, desc.dtype == tensor.dtype());
 
   tensor.reallocate(vector_convert<size_t, int64_t>(desc.cur_shape));
   auto output_tensor = desc_to_tensor(

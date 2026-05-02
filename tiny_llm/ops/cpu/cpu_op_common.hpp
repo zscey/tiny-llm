@@ -17,8 +17,8 @@ auto parallel_run(F f, size_t beg, size_t end,
     -> std::conditional_t<
         std::is_same_v<std::invoke_result_t<F, size_t, size_t>, void>, void,
         std::vector<std::invoke_result_t<F, size_t, size_t>>> {
-  TINY_LLM_CHECK(task_num > 0);
-  TINY_LLM_CHECK(beg < end);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, task_num > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, beg < end);
   auto interval = (end - beg + task_num - 1) / task_num;
 
   std::vector<std::future<std::invoke_result_t<F, size_t, size_t>>> futures;

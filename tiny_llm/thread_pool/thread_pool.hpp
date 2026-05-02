@@ -1,6 +1,7 @@
 #pragma once
 
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -71,7 +72,7 @@ public:
   auto enqueue(F &&f, Args &&...args)
       -> std::future<std::invoke_result_t<F, Args...>> {
     if (shutting_down_.load(std::memory_order_acquire)) {
-      TINY_LLM_THROW_ERROR(std::runtime_error,
+      TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
                            "Enqueue on stopped ThreadPool.");
     }
 

@@ -6,7 +6,7 @@ cc_library(
     name = "weight_managers",
     hdrs = ["weight_managers.hpp"],
     deps = [
-        "//tiny_llm/common:common_macros",
+        "//tiny_llm/common",
         "//tiny_llm/tensor",
     ],
 )

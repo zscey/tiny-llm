@@ -1,5 +1,6 @@
 #include "tiny_llm/graph/graph.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include <algorithm>
 #include <numeric>
 #include <queue>
@@ -11,7 +12,7 @@ auto get_tensor(Graph &graph, const std::string &name) -> Graph::TensorInfo & {
   if (auto iter = graph.tensor_name_to_idx.find(name);
       iter != graph.tensor_name_to_idx.end()) {
     auto &named_tensor_info = graph.tensor_infos[iter->second];
-    TINY_LLM_CHECK(named_tensor_info);
+    TINY_LLM_CHECK(tiny_llm::RuntimeError, named_tensor_info);
     return named_tensor_info->second;
   }
 
@@ -25,7 +26,8 @@ auto get_tensor(Graph &graph, const std::string &name) -> Graph::TensorInfo & {
 void Graph::add_tensor(const std::string &name, DataType dtype,
                        std::vector<int64_t> shape) {
   auto &named_tensor_info = get_tensor(*this, name);
-  TINY_LLM_CHECK(named_tensor_info.has_explicit_added == false);
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 named_tensor_info.has_explicit_added == false);
 
   named_tensor_info.has_explicit_added = true;
   named_tensor_info.dtype = dtype;
@@ -34,9 +36,11 @@ void Graph::add_tensor(const std::string &name, DataType dtype,
 
 void Graph::add_node(const std::string &name, const NodeIONames &node_io_names,
                      Param param) {
-  TINY_LLM_CHECK(!node_name_to_idx.contains(name));
-  TINY_LLM_CHECK(node_io_names.input_names.size() == input_num(param));
-  TINY_LLM_CHECK(node_io_names.output_names.size() == output_num(param));
+  TINY_LLM_CHECK(tiny_llm::RuntimeError, !node_name_to_idx.contains(name));
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 node_io_names.input_names.size() == input_num(param));
+  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+                 node_io_names.output_names.size() == output_num(param));
 
   auto node_id = nodes.size();
   node_name_to_idx.emplace(name, node_id);
@@ -52,7 +56,7 @@ void Graph::add_node(const std::string &name, const NodeIONames &node_io_names,
 
   for (const auto &name : node_io_names.output_names) {
     auto &named_tensor_info = get_tensor(*this, name);
-    TINY_LLM_CHECK(!named_tensor_info.producer_node);
+    TINY_LLM_CHECK(tiny_llm::RuntimeError, !named_tensor_info.producer_node);
     named_tensor_info.producer_node = node_id;
     named_node->second.output_tensors.emplace_back(tensor_name_to_idx.at(name));
   }
@@ -60,18 +64,20 @@ void Graph::add_node(const std::string &name, const NodeIONames &node_io_names,
 
 void Graph::set_input_names(std::unordered_set<std::string> input_names) {
   TINY_LLM_CHECK(
+      tiny_llm::RuntimeError,
       std::ranges::all_of(input_names, [this](const auto &name) -> auto {
         return tensor_name_to_idx.contains(name);
-      }))
+      }));
 
   this->input_names = std::move(input_names);
 }
 
 void Graph::set_output_names(std::unordered_set<std::string> output_names) {
   TINY_LLM_CHECK(
+      tiny_llm::RuntimeError,
       std::ranges::all_of(output_names, [this](const auto &name) -> auto {
         return tensor_name_to_idx.contains(name);
-      }))
+      }));
 
   this->output_names = std::move(output_names);
 }
@@ -134,7 +140,7 @@ auto is_valid_nodes(const Graph &g) -> bool {
                                                    consumer_nodes.end()};
       if (unique_consumer.size() != 1) {
         TINY_LLM_THROW_ERROR(
-            std::runtime_error,
+            tiny_llm::RuntimeError,
             "Tensor [{}] is the input for inplace operation, but it has {} "
             "consumers.",
             g.tensor_infos.at(named_node->second.input_tensors.at(inner_id))

@@ -1,5 +1,6 @@
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/cuda_checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_device_guard.hpp"
 
@@ -32,7 +33,8 @@ auto CudaAllocator::Allocate(std::size_t size) -> Buffer {
 
   void *ptr{};
   if (size > 0) {
-    TINY_LLM_CUDA_CHECK(cudaMallocAsync(&ptr, size, cuda_context.stream));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError,
+                        cudaMallocAsync(&ptr, size, cuda_context.stream));
   }
 
   return {ptr,
@@ -61,7 +63,7 @@ public:
 auto CudaHostAllocator::Allocate(std::size_t size) -> Buffer {
   void *ptr{};
   if (size > 0) {
-    TINY_LLM_CUDA_CHECK(cudaMallocHost(&ptr, size));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaMallocHost(&ptr, size));
   }
 
   return {ptr,

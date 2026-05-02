@@ -1,5 +1,6 @@
 #include "tiny_llm/logit_processors/sample_processors.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include <random>
 
 namespace tiny_llm {
@@ -15,8 +16,10 @@ void MultinomialProcessor::apply(Tensor &logit, Tensor &id,
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
   for (int64_t i = 0; i < batch; ++i) {
-    TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] <= dim);
-    TINY_LLM_CHECK(valid_size.data<uint32_t>()[i] >= 1);
+    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                   valid_size.data<uint32_t>()[i] <= dim);
+    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                   valid_size.data<uint32_t>()[i] >= 1);
   }
 
   for (int64_t b = 0; b < batch; ++b) {

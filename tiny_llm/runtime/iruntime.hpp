@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tiny_llm/common/common_macros.hpp"
+#include "tiny_llm/common/construct_macros.hpp"
 #include "tiny_llm/tensor/tensor.hpp"
 #include <string>
 #include <vector>

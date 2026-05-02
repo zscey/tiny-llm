@@ -7,7 +7,7 @@ cc_library(
     srcs = ["cpu_allocator.cpp"],
     hdrs = ["cpu_allocator.hpp"],
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/device_managers:buffer",
     ],
 )

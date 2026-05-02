@@ -14,7 +14,7 @@ cc_library(
         "memory_planer.hpp",
     ],
     deps = [
-        "//tiny_llm/common:common_macros",
+        "//tiny_llm/common",
     ],
 )
 
@@ -24,7 +24,6 @@ cc_library(
     hdrs = ["greedy_memory_planer.hpp"],
     deps = [
         "memory_planer",
-        "//tiny_llm/common:log_and_excepts",
     ],
 )
 
@@ -32,7 +31,6 @@ cc_library(
     name = "iruntime",
     hdrs = ["iruntime.hpp"],
     deps = [
-        "//tiny_llm/common:common_macros",
         "//tiny_llm/tensor",
     ],
 )

@@ -15,7 +15,7 @@ cc_library(
     hdrs = ["graph.hpp"],
     deps = [
         ":param",
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/tensor",
     ],
 )

@@ -20,8 +20,7 @@ cc_library(
     hdrs = ["weight_manager.hpp"],
     deps = [
         ":rust_safetensors",
-        "//tiny_llm/common:common_macros",
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/weight_managers",
     ],
 )

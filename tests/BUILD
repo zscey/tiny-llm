@@ -33,7 +33,7 @@ cc_test(
         "//conditions:default": [],
     }),
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/device_managers/cpu:cpu_allocator",
         "//tiny_llm/graph:graph_optimizer",
         "//tiny_llm/logit_processors:argmax_processor",

@@ -16,7 +16,6 @@ template <>
   return DataType::kUint32;
 }
 
-// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-function-cognitive-complexity)
 [[maybe_unused]] void test_tensor_attrs(const Tensor &tensor, Device device,
                                         DataType dtype,
                                         const std::vector<int64_t> &shape,
@@ -31,7 +30,6 @@ template <>
   EXPECT_EQ(tensor.element_size(), element_size);
   EXPECT_EQ(tensor.is_continuous(), is_continuous);
 }
-// NOLINTEND(bugprone-easily-swappable-parameters,readability-function-cognitive-complexity)
 } // namespace
 
 template <typename T> class TensorBaseTest : public ::testing::Test {
