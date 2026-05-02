@@ -1,15 +1,14 @@
 #include "tiny_llm/tensor/tensor.hpp"
 #include "tiny_llm/common/checks.hpp"
 #include "tiny_llm/common/exception.hpp"
+#include "tiny_llm/device_managers/copy_data.hpp"
 #include "tiny_llm/device_managers/cpu/cpu_allocator.hpp"
 #include <algorithm>
 #include <numeric>
 #include <stdexcept>
 
 #ifdef TINY_LLM_TENSOR_WITH_CUDA
-#include "tiny_llm/common/cuda_checks.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_allocator.hpp"
-#include "tiny_llm/device_managers/cuda/cuda_context.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_device_guard.hpp"
 #endif
 
@@ -21,7 +20,7 @@ auto to_string(DataType dtype) -> std::string {
   case DataType::kUint32:
     return "Uint32";
   default:
-    return "Unknow";
+    return "Unknown";
   }
 }
 
@@ -255,60 +254,7 @@ void Tensor::copy_to(Tensor &tensor) const {
     return;
   }
 
-  switch (device_.type) {
-#ifdef TINY_LLM_TENSOR_WITH_CUDA
-  case DeviceType::kCudaHost:
-#endif
-  case DeviceType::kCpu: {
-    switch (tensor.device_.type) {
-#ifdef TINY_LLM_TENSOR_WITH_CUDA
-    case DeviceType::kCuda:
-      TINY_LLM_CUDA_CHECK(
-          tiny_llm::CudaError,
-          cudaMemcpyAsync(tensor.data(), data(), copy_size,
-                          cudaMemcpyHostToDevice,
-                          ThreadCudaContexts::GetContext().stream));
-      return;
-    case DeviceType::kCudaHost:
-#endif
-    case DeviceType::kCpu:
-      std::memcpy(tensor.data(), data(), copy_size);
-      return;
-    default:
-      break;
-    }
-  }
-#ifdef TINY_LLM_TENSOR_WITH_CUDA
-  case DeviceType::kCuda: {
-    switch (tensor.device_.type) {
-    case DeviceType::kCuda:
-      TINY_LLM_CHECK(tiny_llm::RuntimeError, device_.id == tensor.device_.id);
-      TINY_LLM_CUDA_CHECK(
-          tiny_llm::CudaError,
-          cudaMemcpyAsync(tensor.data(), data(), copy_size,
-                          cudaMemcpyDeviceToDevice,
-                          ThreadCudaContexts::GetContext().stream));
-    case DeviceType::kCudaHost:
-    case DeviceType::kCpu:
-      TINY_LLM_CUDA_CHECK(
-          tiny_llm::CudaError,
-          cudaMemcpyAsync(tensor.data(), data(), copy_size,
-                          cudaMemcpyDeviceToHost,
-                          ThreadCudaContexts::GetContext().stream));
-      return;
-    default:
-      break;
-    }
-  }
-#endif
-  default:
-    break;
-  }
-
-  TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
-                       "Copy from [{}:{}] to [{}:{}] not implemented.",
-                       to_string(device_.type), device_.id,
-                       to_string(tensor.device_.type), tensor.device_.id);
+  copy_data(data(), device_, tensor.data(), tensor.device_, copy_size);
 }
 
 auto Tensor::to(Device device) const -> Tensor {
