@@ -7,7 +7,7 @@ cc_library(
     srcs = ["llama_parser.cpp"],
     hdrs = ["llama_parser.hpp"],
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/graph",
         "@nlohmann_json//:json",
     ],

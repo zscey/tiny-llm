@@ -5,5 +5,5 @@ package(default_visibility = ["//:__subpackages__"])
 cc_library(
     name = "thread_pool",
     hdrs = ["thread_pool.hpp"],
-    deps = ["//tiny_llm/common:log_and_excepts"],
+    deps = ["//tiny_llm/common"],
 )

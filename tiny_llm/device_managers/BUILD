@@ -7,6 +7,6 @@ cc_library(
     srcs = ["buffer.cpp"],
     hdrs = ["buffer.hpp"],
     deps = [
-        "//tiny_llm/common:common_macros",
+        "//tiny_llm/common",
     ],
 )

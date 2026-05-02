@@ -7,7 +7,7 @@ cc_library(
     srcs = ["cuda_kernels.cpp"],
     hdrs = ["cuda_kernels.hpp"],
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/graph:param",
         "//tiny_llm/ops/cuda:cuda_ops",
         "//tiny_llm/runtime:common",
@@ -31,7 +31,6 @@ cc_library(
     hdrs = ["cuda_runtime.hpp"],
     deps = [
         ":cuda_plan",
-        "//tiny_llm/common:log_and_excepts",
         "//tiny_llm/device_managers/cuda:cuda_allocator",
         "//tiny_llm/device_managers/cuda:cuda_context",
         "//tiny_llm/runtime:greedy_memory_planer",

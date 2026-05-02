@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tiny_llm/common/common_macros.hpp"
+#include "tiny_llm/common/construct_macros.hpp"
 #include <concepts>
 #include <cstdint>
 #include <memory>

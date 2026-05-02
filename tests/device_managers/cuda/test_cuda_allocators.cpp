@@ -5,7 +5,6 @@
 
 namespace tiny_llm {
 namespace {
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void test_case(size_t size) {
   auto host_buffer = CudaHostAllocator::Allocate(size);
   if (size != 0) {

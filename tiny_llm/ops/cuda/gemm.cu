@@ -1,6 +1,7 @@
 #include "cccl/cuda/warp"
 #include "cub/cub.cuh"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/ops/cuda/gemm.hpp"
 #include <cstddef>
 
@@ -381,7 +382,7 @@ gemm_row_major_sl_no_bias_kernel(const float *input, const float *weight,
 
 void gemm_row_major(const float *input, const float *weight, const float *bias,
                     float *dst, uint32_t m, uint32_t d, uint32_t n) {
-  TINY_LLM_CHECK(bias == nullptr);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
   if (m == 0 || d == 0 || n == 0) {
     return;
   }
@@ -403,8 +404,8 @@ void gemm_row_major_lt(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t q,
                        uint32_t d, uint32_t out_head, uint32_t out_d,
                        uint32_t q_start, uint32_t q_end) {
-  TINY_LLM_CHECK(bias == nullptr);
-  TINY_LLM_CHECK(q_start + q <= q_end);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, q_start + q <= q_end);
   if (b == 0 || q == 0 || d == 0 || out_head == 0 || out_d == 0) {
     return;
   }
@@ -428,7 +429,7 @@ void gemm_row_major_lt(const float *input, const float *weight,
 void gemm_row_major_tl(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t h,
                        uint32_t q, uint32_t d, uint32_t out_d) {
-  TINY_LLM_CHECK(bias == nullptr);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
   if (b == 0 || h == 0 || q == 0 || d == 0 || out_d == 0) {
     return;
   }
@@ -453,8 +454,8 @@ void gemm_row_major_sl(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t q,
                        uint32_t d, uint32_t n, uint32_t q_start,
                        uint32_t q_end) {
-  TINY_LLM_CHECK(bias == nullptr);
-  TINY_LLM_CHECK(q_start + q <= q_end);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, q_start + q <= q_end);
   if (b == 0 || q == 0 || d == 0 || n == 0) {
     return;
   }

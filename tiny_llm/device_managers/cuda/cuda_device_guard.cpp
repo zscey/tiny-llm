@@ -1,12 +1,13 @@
 #include "tiny_llm/device_managers/cuda/cuda_device_guard.hpp"
 #include "cuda_runtime.h"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/cuda_checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 
 namespace tiny_llm {
 CudaDeviceSwitchGuard::CudaDeviceSwitchGuard(int32_t target_dev) {
-  TINY_LLM_CUDA_CHECK(cudaGetDevice(&origin_dev_));
+  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&origin_dev_));
   if (target_dev >= 0 && origin_dev_ != target_dev) {
-    TINY_LLM_CUDA_CHECK(cudaSetDevice(target_dev));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaSetDevice(target_dev));
   }
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tiny_llm/common/common_macros.hpp"
+#include "tiny_llm/common/construct_macros.hpp"
 #include "tiny_llm/graph/graph.hpp"
 #include "tiny_llm/weight_managers/weight_managers.hpp"
 #include <concepts>

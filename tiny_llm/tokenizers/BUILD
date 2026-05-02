@@ -6,6 +6,6 @@ cc_library(
     name = "tokenizers",
     hdrs = ["tokenizers.hpp"],
     deps = [
-        "//tiny_llm/common:common_macros",
+        "//tiny_llm/common",
     ],
 )

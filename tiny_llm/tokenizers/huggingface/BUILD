@@ -19,7 +19,7 @@ cc_library(
     hdrs = ["tokenizers.hpp"],
     deps = [
         ":rust_tokenizers",
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/tokenizers",
     ],
 )

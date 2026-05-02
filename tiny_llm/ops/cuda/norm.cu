@@ -2,7 +2,8 @@
 #include "cccl/cuda/warp"
 #include "cub/cub.cuh"
 #include "cuda_op_common.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/ops/cuda/norm.hpp"
 
 namespace tiny_llm::cuda {
@@ -60,7 +61,7 @@ void rms_norm(const float *input, const float *weight, float *dst,
   if (element_size == 0) {
     return;
   }
-  TINY_LLM_CHECK(dim > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, dim > 0);
 
   if (dim <= 64) {
     CALL_KERNEL(2);
@@ -79,7 +80,7 @@ void rms_norm(const float *input, const float *weight, float *dst,
     return;
   }
 
-  TINY_LLM_THROW_ERROR(std::runtime_error,
+  TINY_LLM_THROW_ERROR(tiny_llm::NotImplementedError,
                        "The condition `dim={}` is not implemented.", dim);
 }
 // NOLINTEND(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)

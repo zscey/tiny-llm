@@ -6,7 +6,7 @@ cc_library(
     name = "logit_processors",
     hdrs = ["logit_processors.hpp"],
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "//tiny_llm/tensor",
     ],
 )

@@ -7,8 +7,7 @@ cc_library(
     srcs = ["cuda_device_guard.cpp"],
     hdrs = ["cuda_device_guard.hpp"],
     deps = [
-        "//tiny_llm/common:common_macros",
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "@cuda//:cuda_runtime",
     ],
 )
@@ -37,7 +36,7 @@ cc_library(
     srcs = ["cuda_device_infos.cpp"],
     hdrs = ["cuda_device_infos.hpp"],
     deps = [
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "@cuda//:cuda_runtime",
     ],
 )

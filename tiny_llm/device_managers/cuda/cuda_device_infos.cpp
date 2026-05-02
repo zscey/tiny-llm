@@ -1,14 +1,17 @@
 #include "tiny_llm/device_managers/cuda/cuda_device_infos.hpp"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/cuda_checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 
 namespace tiny_llm {
 CudaDeviceInfos::CudaDeviceInfos() {
   int32_t dev_num{};
-  TINY_LLM_CUDA_CHECK(cudaGetDeviceCount(&dev_num));
+  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDeviceCount(&dev_num));
   device_props_.resize(dev_num);
 
   for (int32_t i = 0; i < dev_num; ++i) {
-    TINY_LLM_CUDA_CHECK(cudaGetDeviceProperties(&device_props_.at(i), i));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError,
+                        cudaGetDeviceProperties(&device_props_.at(i), i));
   }
 }
 
@@ -21,10 +24,11 @@ auto get_cuda_dev_prop(int32_t dev_id) -> const cudaDeviceProp & {
   const auto &device_infos = CudaDeviceInfos::Instance();
 
   if (dev_id < 0) {
-    TINY_LLM_CUDA_CHECK(cudaGetDevice(&dev_id));
+    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
   }
-  TINY_LLM_CHECK(static_cast<size_t>(dev_id) <
-                 device_infos.device_props_.size());
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+                 static_cast<size_t>(dev_id) <
+                     device_infos.device_props_.size());
   return device_infos.device_props_.at(dev_id);
 }
 

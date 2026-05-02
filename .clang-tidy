@@ -29,6 +29,7 @@ Checks:
   - '-cppcoreguidelines-avoid-c-arrays'
   - '-modernize-avoid-c-arrays'
   - '-misc-non-private-member-variables-in-classes'
+  - '-cppcoreguidelines-avoid-do-while'
 
 WarningsAsErrors: '*'
 CheckOptions:

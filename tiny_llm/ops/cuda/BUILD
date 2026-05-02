@@ -29,7 +29,7 @@ cuda_library(
     hdrs = ["gemm.hpp"],
     deps = [
         ":cuda_op_common",
-        "//tiny_llm/common:log_and_excepts",
+        "//tiny_llm/common",
         "@cuda//:cub",
         "@cuda//:libcudacxx",
     ],
@@ -50,7 +50,6 @@ cuda_library(
     hdrs = ["embedding.hpp"],
     deps = [
         ":cuda_op_common",
-        "//tiny_llm/common:log_and_excepts",
     ],
 )
 
@@ -60,7 +59,6 @@ cuda_library(
     hdrs = ["flash_attention.hpp"],
     deps = [
         ":cuda_op_common",
-        "//tiny_llm/common:log_and_excepts",
         "//tiny_llm/device_managers/cuda:cuda_device_infos",
         "@cuda//:cub",
         "@cuda//:libcudacxx",
@@ -73,7 +71,6 @@ cuda_library(
     hdrs = ["norm.hpp"],
     deps = [
         ":cuda_op_common",
-        "//tiny_llm/common:log_and_excepts",
         "@cuda//:cub",
         "@cuda//:libcudacxx",
     ],

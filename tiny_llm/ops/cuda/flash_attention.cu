@@ -1,7 +1,8 @@
 #include "cccl/cuda/warp"
 #include "cub/cub.cuh"
 #include "math_constants.h"
-#include "tiny_llm/common/log_and_excepts.hpp"
+#include "tiny_llm/common/checks.hpp"
+#include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/device_managers/cuda/cuda_device_infos.hpp"
 #include "tiny_llm/ops/cuda/flash_attention.hpp"
 
@@ -226,21 +227,21 @@ void flash_attn(const float *query, const float *key, const float *value,
                 float *dst, uint32_t batch, uint32_t q_head, uint32_t kv_head,
                 uint32_t q_length, uint32_t kv_length, uint32_t dim,
                 uint32_t kv_end, AttentionType attn_type) {
-  TINY_LLM_CHECK(batch > 0);
-  TINY_LLM_CHECK(q_length > 0);
-  TINY_LLM_CHECK(kv_length > 0);
-  TINY_LLM_CHECK(kv_end > 0);
-  TINY_LLM_CHECK(dim > 0);
-  TINY_LLM_CHECK(q_head > 0);
-  TINY_LLM_CHECK(kv_head > 0);
-  TINY_LLM_CHECK(q_head % kv_head == 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, batch > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, q_length > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, kv_length > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, kv_end > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, dim > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, q_head > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, kv_head > 0);
+  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, q_head % kv_head == 0);
 
   auto context = ThreadCudaContexts::GetContext();
   size_t share_mem_size =
       sizeof(float) * ((2 * kTileKV) + kTileQ) * GET_PADDED_DIM(dim);
   if (share_mem_size > CudaDeviceInfos::SharedMemPerBlockOptin(context.id)) {
     TINY_LLM_THROW_ERROR(
-        std::runtime_error,
+        tiny_llm::RuntimeError,
         "The requested shared memory ({}) exceeds the allocatable limit ({}).",
         share_mem_size, CudaDeviceInfos::SharedMemPerBlockOptin(context.id));
   }
@@ -280,7 +281,7 @@ void flash_attn(const float *query, const float *key, const float *value,
     break;
   }
 
-  TINY_LLM_THROW_ERROR(std::runtime_error,
+  TINY_LLM_THROW_ERROR(tiny_llm::NotImplementedError,
                        "The condition `dim={}` is not implemented.", dim);
 }
 // NOLINTEND(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)

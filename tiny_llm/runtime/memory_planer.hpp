@@ -1,6 +1,5 @@
 #pragma once
 
-#include "tiny_llm/common/common_macros.hpp"
 #include <concepts>
 #include <cstddef>
 
