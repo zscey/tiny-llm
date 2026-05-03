@@ -132,23 +132,25 @@ auto is_valid_nodes(const Graph &g) -> bool {
     };
 
     auto inner_inplace_ids = get_inplace_input_ids(named_node->second.param);
-    for (auto inner_id : inner_inplace_ids) {
-      const auto &consumer_nodes =
-          g.tensor_infos.at(named_node->second.input_tensors.at(inner_id))
-              ->second.consumer_nodes;
-      std::unordered_set<uint32_t> unique_consumer{consumer_nodes.begin(),
-                                                   consumer_nodes.end()};
-      if (unique_consumer.size() != 1) {
-        TINY_LLM_THROW_ERROR(
-            tiny_llm::RuntimeError,
-            "Tensor [{}] is the input for inplace operation, but it has {} "
-            "consumers.",
-            g.tensor_infos.at(named_node->second.input_tensors.at(inner_id))
-                ->first,
-            unique_consumer.size());
-      }
-    }
-    return true;
+    return std::ranges::all_of(
+        inner_inplace_ids, [&g, &named_node](auto inner_id) -> bool {
+          const auto &consumer_nodes =
+              g.tensor_infos.at(named_node->second.input_tensors.at(inner_id))
+                  ->second.consumer_nodes;
+          std::unordered_set<uint32_t> unique_consumer{consumer_nodes.begin(),
+                                                       consumer_nodes.end()};
+          if (unique_consumer.size() != 1) {
+            spdlog::error(
+                "Tensor [{}] is the input for inplace operation, but it has "
+                "{} consumers.",
+                g.tensor_infos
+                    .at(named_node->second.input_tensors.at(inner_id))
+                    ->first,
+                unique_consumer.size());
+            return false;
+          }
+          return true;
+        });
   });
 }
 } // namespace

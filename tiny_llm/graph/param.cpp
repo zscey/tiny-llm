@@ -4,18 +4,25 @@
 namespace tiny_llm {
 namespace {
 constexpr auto kInputVisitor = Visitor{
-    [](const SiLUParam &) -> uint32_t { return 1; },
-    [](const EmbeddingParam &) -> uint32_t { return 2; },
-    [](const RopeParam &) -> uint32_t { return 0; },
-    [](const RMSNormParam &) -> uint32_t { return 2; },
-    [](const AddParam &) -> uint32_t { return 2; },
-    [](const MulParam &) -> uint32_t { return 2; },
-    [](const LinearParam &param) -> uint32_t { return param.bias ? 3 : 2; },
+    [](const SiLUParam &) -> uint32_t { return extern_input_num<SiLUParam>(); },
+    [](const EmbeddingParam &) -> uint32_t {
+      return extern_input_num<EmbeddingParam>() + 1;
+    },
+    [](const RopeParam &) -> uint32_t { return extern_input_num<RopeParam>(); },
+    [](const RMSNormParam &) -> uint32_t {
+      return extern_input_num<RMSNormParam>() + 1;
+    },
+    [](const AddParam &) -> uint32_t { return extern_input_num<AddParam>(); },
+    [](const MulParam &) -> uint32_t { return extern_input_num<MulParam>(); },
+    [](const LinearParam &param) -> uint32_t {
+      return extern_input_num<LinearParam>() + 1 + (param.bias ? 1 : 0);
+    },
     [](const CausalAttentionParam &param) -> uint32_t {
-      return param.bias ? 12 : 8;
+      return extern_input_num<CausalAttentionParam>() + 4 +
+             (param.bias ? 4 : 0);
     },
     [](const SliceLinearParam &param) -> uint32_t {
-      return param.bias ? 3 : 2;
+      return extern_input_num<SliceLinearParam>() + 1 + (param.bias ? 1 : 0);
     },
 };
 
