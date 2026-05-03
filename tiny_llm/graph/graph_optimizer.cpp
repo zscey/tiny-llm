@@ -95,7 +95,7 @@ void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
 }
 } // namespace
 
-void DCEPass::run(Graph &g, WeightManagerWrapper & /*w*/) {
+void DCEPass::run(Graph &g) {
   (void)(this);
 
   std::vector<bool> is_visited(g.nodes.size(), false);

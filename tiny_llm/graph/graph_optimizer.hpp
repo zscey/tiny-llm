@@ -2,16 +2,14 @@
 
 #include "tiny_llm/common/construct_macros.hpp"
 #include "tiny_llm/graph/graph.hpp"
-#include "tiny_llm/weight_managers/weight_managers.hpp"
 #include <concepts>
 #include <memory>
 
 namespace tiny_llm {
 template <typename T>
-concept GraphPass = std::move_constructible<T> &&
-                    requires(T t, Graph &g, WeightManagerWrapper &w) {
-                      { t.run(g, w) } -> std::same_as<void>;
-                    };
+concept GraphPass = std::move_constructible<T> && requires(T t, Graph &g) {
+  { t.run(g) } -> std::same_as<void>;
+};
 
 class PassManager {
   struct Concept {
@@ -19,7 +17,7 @@ class PassManager {
     TINY_LLM_DEFAULT_COPY_MOVE(Concept);
     virtual ~Concept() = default;
 
-    virtual void run(Graph &g, WeightManagerWrapper &w) = 0;
+    virtual void run(Graph &g) = 0;
   };
 
   template <GraphPass T> struct Container final : public Concept {
@@ -27,9 +25,7 @@ class PassManager {
     TINY_LLM_DEFAULT_COPY_MOVE(Container);
     ~Container() override = default;
 
-    void run(Graph &g, WeightManagerWrapper &w) override {
-      pass_concept.run(g, w);
-    }
+    void run(Graph &g) override { pass_concept.run(g); }
     T pass_concept;
   };
 
@@ -43,15 +39,15 @@ public:
         std::make_unique<Container<std::decay_t<T>>>(std::forward<T>(pass)));
   }
 
-  void run(Graph &g, WeightManagerWrapper &w) {
+  void run(Graph &g) {
     for (auto &pass : pipeline_) {
-      pass->run(g, w);
+      pass->run(g);
     }
   }
 };
 
 class DCEPass {
 public:
-  void run(Graph &g, WeightManagerWrapper &w);
+  void run(Graph &g);
 };
 } // namespace tiny_llm

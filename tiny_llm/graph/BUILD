@@ -26,6 +26,5 @@ cc_library(
     hdrs = ["graph_optimizer.hpp"],
     deps = [
         ":graph",
-        "//tiny_llm/weight_managers",
     ],
 )

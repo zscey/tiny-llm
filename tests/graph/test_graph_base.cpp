@@ -1,4 +1,3 @@
-#include "tests/utils/weight_manager.hpp"
 #include "tiny_llm/graph/graph.hpp"
 #include "tiny_llm/graph/graph_optimizer.hpp"
 #include "gtest/gtest.h"
@@ -115,8 +114,7 @@ TEST(Graph, GraphBaseApi) {
 
   PassManager pass_manager;
   pass_manager.add_pass(DCEPass{});
-  WeightManagerWrapper weight_manager(TestWeightManager{});
-  pass_manager.run(graph, weight_manager);
+  pass_manager.run(graph);
   EXPECT_TRUE(is_valid(graph));
   {
     EXPECT_EQ(graph.node_name_to_idx.size(), 1);
