@@ -234,7 +234,7 @@ void Tensor::reallocate(std::vector<int64_t> shape) {
     return;
   }
 
-  *this = Tensor(device_, dtype_, shape_);
+  *this = Tensor(device_, dtype_, shape_, true);
 }
 
 void Tensor::copy_to(Tensor &tensor) const {
