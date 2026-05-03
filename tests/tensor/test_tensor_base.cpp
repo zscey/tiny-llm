@@ -62,7 +62,7 @@ TYPED_TEST(TensorBaseTest, PlatformUnrelated) {
     cur_tensor.reallocate({1});
     test_tensor_attrs(cur_tensor, device, dtype, {1}, {type_size_i64}, 1, true);
     const auto &tensor_ref = cur_tensor;
-    EXPECT_ANY_THROW((void)tensor_ref.data());
+    EXPECT_NO_THROW((void)tensor_ref.data());
     EXPECT_NO_THROW(cur_tensor.data());
   }
 
