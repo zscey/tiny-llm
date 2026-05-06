@@ -3,7 +3,6 @@
 #include "tiny_llm/common/exception.hpp"
 
 namespace tiny_llm {
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void ArgmaxProcessor::apply(Tensor &logit, Tensor &id,
                             Tensor &valid_size) const {
   (void)this;

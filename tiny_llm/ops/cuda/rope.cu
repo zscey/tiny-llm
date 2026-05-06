@@ -4,7 +4,6 @@
 #include "tiny_llm/ops/cuda/rope.hpp"
 
 namespace tiny_llm::cuda {
-// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 namespace {
 constexpr uint32_t kThreadNum = 512;
 
@@ -88,5 +87,4 @@ void apply_rope_inplace(const float *cos, const float *sin,
       cos, sin, position_ids, dst, element_size, head_num, seq_len, half_dim,
       seq_start, seq_end);
 }
-// NOLINTEND(bugprone-easily-swappable-parameters)
 } // namespace tiny_llm::cuda

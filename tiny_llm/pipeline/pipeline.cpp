@@ -90,7 +90,6 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config) {
       valid_size_->device(), valid_size_->dtype(), valid_size_->shape());
 }
 
-// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 auto Pipeline::apply(const std::vector<std::string> &prompts,
                      uint32_t max_new_tokens, bool do_sample, float temperature,
                      uint32_t top_k, float top_p) const
@@ -177,5 +176,4 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
 
   return {tokenizer_->decode(generated_tokens, true)};
 }
-// NOLINTEND(bugprone-easily-swappable-parameters)
 } // namespace tiny_llm

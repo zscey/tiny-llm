@@ -6,7 +6,6 @@
 namespace tiny_llm {
 namespace {
 // [left, right]
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto partition(float *logit, uint32_t *id, int32_t left, int32_t right,
                int32_t pivot_index) -> int32_t {
   float pivot_value = logit[pivot_index];
@@ -29,7 +28,7 @@ auto partition(float *logit, uint32_t *id, int32_t left, int32_t right,
 }
 
 // [left, right]
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters, misc-no-recursion)
+// NOLINTNEXTLINE(misc-no-recursion)
 void quick_select(float *logit, uint32_t *id, int32_t left, int32_t right,
                   int32_t k) {
   if (left >= right) {
@@ -81,7 +80,6 @@ void TopKProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
 
 static_assert(LogitProcessor<TopKProcessor>);
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 TopPProcessor::TopPProcessor(float top_p, uint32_t min_tokens_to_keep) {
   TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, top_p >= 0.F);
   TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, top_p <= 1.F);
@@ -93,7 +91,7 @@ TopPProcessor::TopPProcessor(float top_p, uint32_t min_tokens_to_keep) {
 
 namespace {
 // [left, right]
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters,misc-no-recursion)
+// NOLINTNEXTLINE(misc-no-recursion)
 void quick_sort(float *logit, uint32_t *id, int32_t left, int32_t right) {
   if (left >= right) {
     return;

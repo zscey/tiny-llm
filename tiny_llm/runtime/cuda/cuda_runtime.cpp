@@ -121,7 +121,6 @@ struct SizeCalculator {
     }
   }
 
-  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   void set_v_block(const TensorDesc *from_desc, const TensorDesc *to_desc) {
     auto &to_relation = relations.at(desc_ptr_to_id.at(to_desc));
     if (from_desc != nullptr) {

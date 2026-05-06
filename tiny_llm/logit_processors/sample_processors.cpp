@@ -4,7 +4,6 @@
 #include <random>
 
 namespace tiny_llm {
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void MultinomialProcessor::apply(Tensor &logit, Tensor &id,
                                  Tensor &valid_size) const {
   thread_local std::mt19937 engine(std::random_device{}());

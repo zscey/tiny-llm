@@ -74,7 +74,6 @@ auto is_valid_shape(const std::vector<int64_t> &shape) -> bool {
 }
 
 // TODO(hao.lin): adjust the logic after supporting negative stride.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto is_valid_shape_and_stride(const std::vector<int64_t> &shape,
                                const std::vector<int64_t> &stride,
                                DataType dtype) {
