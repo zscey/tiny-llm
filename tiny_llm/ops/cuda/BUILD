@@ -25,8 +25,14 @@ cuda_library(
 
 cuda_library(
     name = "gemm",
-    srcs = ["gemm.cu"],
-    hdrs = ["gemm.hpp"],
+    srcs = [
+        "gemm.cu",
+        "gemm_q1_helper.cu",
+    ],
+    hdrs = [
+        "gemm.hpp",
+        "gemm_q1_helper.hpp",
+    ],
     deps = [
         ":cuda_op_common",
         "//tiny_llm/common",

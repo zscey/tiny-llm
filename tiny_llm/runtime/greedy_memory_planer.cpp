@@ -10,7 +10,6 @@ auto aligned_pos(size_t pos, size_t alignment) -> size_t {
 }
 } // namespace
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 auto GreedyMemoryPlaner::allocate(size_t size, size_t alignment)
     -> VirtualBlock {
   TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, size > 0);

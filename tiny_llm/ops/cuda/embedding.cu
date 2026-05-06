@@ -3,7 +3,6 @@
 #include "tiny_llm/ops/cuda/embedding.hpp"
 
 namespace tiny_llm::cuda {
-// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 namespace {
 constexpr uint32_t kThreadNum = 512;
 constexpr uint32_t kTile = 8;
@@ -44,5 +43,4 @@ void embedding(const uint32_t *src, const float *emb_weights, float *dst,
                      kThreadNum, 0, ThreadCudaContexts::GetContext().stream>>>(
       src, emb_weights, dst, padded_dim, dim, element_size);
 }
-// NOLINTEND(bugprone-easily-swappable-parameters)
 } // namespace tiny_llm::cuda

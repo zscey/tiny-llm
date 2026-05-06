@@ -49,7 +49,6 @@ public:
   }
 };
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 inline void check_params(const Tensor &logit, const Tensor &id,
                          const Tensor &valid_size) {
   TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,

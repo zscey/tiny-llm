@@ -7,7 +7,7 @@
 #include "tiny_llm/ops/cuda/flash_attention.hpp"
 
 namespace tiny_llm::cuda {
-// NOLINTBEGIN(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
 namespace {
 constexpr uint32_t kWarpSize = 32;
 constexpr uint32_t kWarpNumPerBlock = 16;
@@ -284,5 +284,5 @@ void flash_attn(const float *query, const float *key, const float *value,
   TINY_LLM_THROW_ERROR(tiny_llm::NotImplementedError,
                        "The condition `dim={}` is not implemented.", dim);
 }
-// NOLINTEND(bugprone-easily-swappable-parameters,cppcoreguidelines-pro-bounds-constant-array-index)
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 } // namespace tiny_llm::cuda
