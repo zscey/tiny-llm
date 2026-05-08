@@ -35,7 +35,7 @@ We use Bazel as our build system. The recommended way to install it is via **Baz
 Clone the repository and compile the main entry point in optimization mode:
 
 ```bash
-git clone <repository_url>
+git clone https://github.com/zscey/tiny-llm.git
 cd tiny-llm
 bazelisk build //main -c opt
 ```

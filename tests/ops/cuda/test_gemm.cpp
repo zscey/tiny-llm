@@ -306,7 +306,7 @@ TEST(CudaOps, GemmTL) {
   }
 }
 
-TEST(CudaOps, GemmL) {
+TEST(CudaOps, GemmSL) {
   int64_t b = 2;
   int64_t q_start = 10;
   int64_t q = 40;
