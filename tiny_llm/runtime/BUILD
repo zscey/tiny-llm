@@ -34,3 +34,13 @@ cc_library(
         "//tiny_llm/tensor",
     ],
 )
+
+cc_library(
+    name = "page_pool",
+    srcs = ["page_pool.cpp"],
+    hdrs = ["page_pool.hpp"],
+    deps = [
+        "//tiny_llm/common",
+        "//tiny_llm/tensor",
+    ],
+)
