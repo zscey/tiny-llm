@@ -7,7 +7,7 @@ auto to_string(DeviceType dev_type) -> std::string {
     return "Cpu";
   case DeviceType::kCudaHost:
     return "CudaHost";
-  case tiny_llm::DeviceType::kCuda:
+  case DeviceType::kCuda:
     return "Cuda";
   default:
     return "Unknown";

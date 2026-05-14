@@ -13,7 +13,7 @@ namespace {
 void shrink(Graph &g, std::vector<uint32_t> retain_nodes) {
   // Shrink g.nodes
   std::ranges::sort(retain_nodes);
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, retain_nodes.back() < g.nodes.size());
+  TINY_LLM_CHECK(RuntimeError, retain_nodes.back() < g.nodes.size());
   std::map<uint32_t, uint32_t> node_origin_to_new;
   for (uint32_t i = 0, i_end = retain_nodes.size(); i < i_end; ++i) {
     node_origin_to_new.emplace(retain_nodes[i], i);

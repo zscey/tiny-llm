@@ -33,7 +33,7 @@ auto type_size(DataType dtype) -> size_t {
     break;
   }
 
-  TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError, "Unsupported data type: {}.",
+  TINY_LLM_THROW_ERROR(RuntimeError, "Unsupported data type: {}.",
                        to_string(dtype));
 }
 
@@ -55,7 +55,7 @@ auto allocate_buffer(Device device, size_t size, size_t alignment = 64)
     break;
   }
 
-  TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError, "Unsupported device: ({}, {}).",
+  TINY_LLM_THROW_ERROR(RuntimeError, "Unsupported device: ({}, {}).",
                        to_string(device.type), device.id);
 }
 
@@ -99,7 +99,7 @@ auto is_valid_shape_and_stride(const std::vector<int64_t> &shape,
 Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
                bool pre_allocate)
     : device_(device), dtype_(dtype), shape_(std::move(shape)) {
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, is_valid_shape(shape_));
+  TINY_LLM_CHECK(RuntimeError, is_valid_shape(shape_));
   stride_ = shape_to_stride(shape_, dtype_);
 
   if (pre_allocate) {
@@ -113,19 +113,17 @@ Tensor::Tensor(Device device, DataType dtype, std::vector<int64_t> shape,
                std::shared_ptr<Buffer> buffer)
     : device_(device), dtype_(dtype), shape_(std::move(shape)),
       stride_(std::move(stride)), offset_(offset), buffer_(std::move(buffer)) {
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, !shape_.empty());
+  TINY_LLM_CHECK(RuntimeError, !shape_.empty());
   if (stride_.empty()) {
     stride_ = shape_to_stride(shape_, dtype_);
   }
-  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+  TINY_LLM_CHECK(RuntimeError,
                  is_valid_shape_and_stride(shape_, stride_, dtype_));
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, buffer_ != nullptr);
-  TINY_LLM_CHECK(tiny_llm::RuntimeError,
-                 device_.type == buffer_->get_device().type);
-  TINY_LLM_CHECK(tiny_llm::RuntimeError,
-                 device_.id == buffer_->get_device().id);
+  TINY_LLM_CHECK(RuntimeError, buffer_ != nullptr);
+  TINY_LLM_CHECK(RuntimeError, device_.type == buffer_->get_device().type);
+  TINY_LLM_CHECK(RuntimeError, device_.id == buffer_->get_device().id);
 
-  TINY_LLM_CHECK(tiny_llm::RuntimeError,
+  TINY_LLM_CHECK(RuntimeError,
                  offset + (shape_[0] * stride_[0]) <= buffer_->get_size());
 }
 
@@ -161,7 +159,7 @@ auto Tensor::data() -> void * {
 
 auto Tensor::data() const -> const void * {
   if (!buffer_) {
-    TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError, "Tensor is not allocated.");
+    TINY_LLM_THROW_ERROR(RuntimeError, "Tensor is not allocated.");
   }
   return static_cast<const uint8_t *>(buffer_->get_ptr()) + offset_;
 }
@@ -185,15 +183,15 @@ auto remove_negative_dim(std::vector<int64_t> &shape, int64_t element_size) {
   for (int32_t i = 0, i_end = static_cast<int32_t>(shape.size()); i < i_end;
        ++i) {
     const auto &cur_dim = shape.at(i);
-    TINY_LLM_CHECK(tiny_llm::RuntimeError, cur_dim != 0);
+    TINY_LLM_CHECK(RuntimeError, cur_dim != 0);
     if (cur_dim < 0) {
-      TINY_LLM_CHECK(tiny_llm::RuntimeError, cur_dim == -1);
-      TINY_LLM_CHECK(tiny_llm::RuntimeError, neg_idx < 0);
+      TINY_LLM_CHECK(RuntimeError, cur_dim == -1);
+      TINY_LLM_CHECK(RuntimeError, neg_idx < 0);
       neg_idx = i;
       continue;
     }
 
-    TINY_LLM_CHECK(tiny_llm::RuntimeError,
+    TINY_LLM_CHECK(RuntimeError,
                    (element_size > 0 && element_size % cur_dim == 0));
     element_size /= cur_dim;
   }
@@ -201,7 +199,7 @@ auto remove_negative_dim(std::vector<int64_t> &shape, int64_t element_size) {
   if (neg_idx >= 0) {
     shape.at(neg_idx) = element_size;
   } else {
-    TINY_LLM_CHECK(tiny_llm::RuntimeError, element_size == 1);
+    TINY_LLM_CHECK(RuntimeError, element_size == 1);
   }
 }
 } // namespace
@@ -215,7 +213,7 @@ auto Tensor::is_continuous() const -> bool {
 }
 
 void Tensor::reshape(std::vector<int64_t> shape) {
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, is_continuous());
+  TINY_LLM_CHECK(RuntimeError, is_continuous());
   remove_negative_dim(shape, static_cast<int64_t>(element_size()));
 
   shape_ = std::move(shape);
@@ -223,7 +221,7 @@ void Tensor::reshape(std::vector<int64_t> shape) {
 }
 
 void Tensor::reallocate(std::vector<int64_t> shape) {
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, is_valid_shape(shape));
+  TINY_LLM_CHECK(RuntimeError, is_valid_shape(shape));
   shape_ = std::move(shape);
   stride_ = shape_to_stride(shape_, dtype_);
 
@@ -238,15 +236,13 @@ void Tensor::reallocate(std::vector<int64_t> shape) {
 
 void Tensor::copy_to(Tensor &tensor) const {
   if (!is_continuous()) {
-    TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
-                         "The source tensor is discontinuous.");
+    TINY_LLM_THROW_ERROR(RuntimeError, "The source tensor is discontinuous.");
   }
   if (!tensor.is_continuous()) {
-    TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
-                         "The target tensor is discontinuous.");
+    TINY_LLM_THROW_ERROR(RuntimeError, "The target tensor is discontinuous.");
   }
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, dtype_ == tensor.dtype_);
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, shape_ == tensor.shape_);
+  TINY_LLM_CHECK(RuntimeError, dtype_ == tensor.dtype_);
+  TINY_LLM_CHECK(RuntimeError, shape_ == tensor.shape_);
 
   auto copy_size = element_size() * type_size(dtype_);
   if (copy_size == 0) {

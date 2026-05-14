@@ -16,13 +16,13 @@ void BazelRunfile::Initialize(const std::string &exec_path) {
   static std::once_flag flag;
   std::call_once(flag, [&exec_path]() -> void {
     *runfile_env() = bazel::tools::cpp::runfiles::Runfiles::Create(exec_path);
-    TINY_LLM_CHECK(tiny_llm::RuntimeError, *runfile_env());
+    TINY_LLM_CHECK(RuntimeError, *runfile_env());
   });
 }
 
 auto BazelRunfile::RLocation(const std::string &location) -> std::string {
   auto res = (*runfile_env())->Rlocation(location);
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, !res.empty());
+  TINY_LLM_CHECK(RuntimeError, !res.empty());
   return res;
 }
 } // namespace tiny_llm::utils

@@ -26,14 +26,12 @@ auto all_zero(const Tensor &unfinished) -> bool {
 } // namespace
 
 Pipeline::Pipeline(const std::string &model_path, PipelineConfig config) {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+  TINY_LLM_CHECK(InvalidArgumentError,
                  config.model_type == ModelType::kTinyLlama);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 config.dtype == DataType::kFloat32);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 config.device.type == DeviceType::kCuda);
+  TINY_LLM_CHECK(InvalidArgumentError, config.dtype == DataType::kFloat32);
+  TINY_LLM_CHECK(InvalidArgumentError, config.device.type == DeviceType::kCuda);
   // TODO(): support batch > 1
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, config.batch == 1);
+  TINY_LLM_CHECK(InvalidArgumentError, config.batch == 1);
 
   std::filesystem::path model_root(model_path);
 
@@ -44,7 +42,7 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config) {
   // runtime_
   std::ifstream f(model_root / "config.json");
   auto json = nlohmann::json::parse(f);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+  TINY_LLM_CHECK(InvalidArgumentError,
                  (!json["torch_dtype"].is_null() &&
                   json["torch_dtype"].get<std::string>() == "float32"));
   f.close();
@@ -95,7 +93,7 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
                      uint32_t top_k, float top_p) const
     -> std::vector<std::string> {
   // TODO(): support batch > 1
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+  TINY_LLM_CHECK(InvalidArgumentError,
                  prompts.size() ==
                      static_cast<size_t>(unfinished_->shape().at(0)));
 
@@ -103,16 +101,14 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
   {
     runtime_->set_prefill(true);
 
-    tiny_llm::Tensor token_ids(
-        {.type = tiny_llm::DeviceType::kCpu, .id = 0},
-        tiny_llm::DataType::kUint32,
+    Tensor token_ids(
+        {.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
         {1, static_cast<int64_t>(tokenize_res.size())}, {}, 0,
-        std::make_shared<tiny_llm::Buffer>(
-            tokenize_res.data(), tokenize_res.size() * sizeof(uint32_t),
-            tiny_llm::Device{.type = tiny_llm::DeviceType::kCpu, .id = 0}));
-    tiny_llm::Tensor pos_ids({.type = tiny_llm::DeviceType::kCpu, .id = 0},
-                             tiny_llm::DataType::kUint32,
-                             {1, static_cast<int64_t>(tokenize_res.size())});
+        std::make_shared<Buffer>(tokenize_res.data(),
+                                 tokenize_res.size() * sizeof(uint32_t),
+                                 Device{.type = DeviceType::kCpu, .id = 0}));
+    Tensor pos_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
+                   {1, static_cast<int64_t>(tokenize_res.size())});
     auto *pos_ids_ptr = pos_ids.data<uint32_t>();
     std::iota(pos_ids_ptr, pos_ids_ptr + tokenize_res.size(), 0);
 
@@ -141,10 +137,10 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
     auto vocab_size = static_cast<uint32_t>(output_->shape().back());
     std::vector<int64_t> target_shape{1, vocab_size};
     *unfinished_->data<uint32_t>() = 1;
-    tiny_llm::Tensor token_ids({.type = tiny_llm::DeviceType::kCpu, .id = 0},
-                               tiny_llm::DataType::kUint32, {1, 1});
-    tiny_llm::Tensor pos_ids({.type = tiny_llm::DeviceType::kCpu, .id = 0},
-                             tiny_llm::DataType::kUint32, {1, 1});
+    Tensor token_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
+                     {1, 1});
+    Tensor pos_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
+                   {1, 1});
 
     while (generated_tokens.size() < max_new_tokens &&
            !all_zero(*unfinished_)) {

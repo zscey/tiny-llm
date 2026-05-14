@@ -12,8 +12,8 @@ auto aligned_pos(size_t pos, size_t alignment) -> size_t {
 
 auto GreedyMemoryPlaner::allocate(size_t size, size_t alignment)
     -> VirtualBlock {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, size > 0);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, alignment > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, size > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, alignment > 0);
 
   auto iter = v_blocks_.begin();
   while (iter != v_blocks_.end()) {
@@ -46,8 +46,7 @@ auto GreedyMemoryPlaner::allocate(size_t size, size_t alignment)
 }
 
 void GreedyMemoryPlaner::deallocate(VirtualBlock v_block) {
-  TINY_LLM_CHECK(tiny_llm::RuntimeError,
-                 v_block.offset + v_block.size <= total_size_);
+  TINY_LLM_CHECK(RuntimeError, v_block.offset + v_block.size <= total_size_);
 
   auto iter = v_blocks_.begin();
   while (iter != v_blocks_.end()) {
@@ -62,7 +61,7 @@ void GreedyMemoryPlaner::deallocate(VirtualBlock v_block) {
       if (iter != v_blocks_.begin()) {
         auto prev_iter = std::prev(iter);
         if (prev_iter->offset + prev_iter->size > iter->offset) {
-          TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError, "Bad virtual block.");
+          TINY_LLM_THROW_ERROR(RuntimeError, "Bad virtual block.");
         }
         if (prev_iter->offset + prev_iter->size == iter->offset) {
           iter->offset = prev_iter->offset;
@@ -83,7 +82,7 @@ void GreedyMemoryPlaner::deallocate(VirtualBlock v_block) {
     } else {
       if (!v_blocks_.empty()) {
         if (v_blocks_.back().offset + v_blocks_.back().size > v_block.offset) {
-          TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError, "Bad virtual block.");
+          TINY_LLM_THROW_ERROR(RuntimeError, "Bad virtual block.");
         }
       }
       v_blocks_.emplace_back(v_block);

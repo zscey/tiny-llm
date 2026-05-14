@@ -23,7 +23,7 @@ void copy_data(const void *src_ptr, Device src_device, void *dst_ptr,
 #ifdef TINY_LLM_COPY_DATA_WITH_CUDA
     case DeviceType::kCuda:
       TINY_LLM_CUDA_CHECK(
-          tiny_llm::CudaError,
+          CudaError,
           cudaMemcpyAsync(dst_ptr, src_ptr, size, cudaMemcpyHostToDevice,
                           ThreadCudaContexts::GetContext().stream));
       return;
@@ -40,17 +40,16 @@ void copy_data(const void *src_ptr, Device src_device, void *dst_ptr,
   case DeviceType::kCuda: {
     switch (dst_device.type) {
     case DeviceType::kCuda:
-      TINY_LLM_CHECK(tiny_llm::NotImplementedError,
-                     src_device.id == dst_device.id);
+      TINY_LLM_CHECK(NotImplementedError, src_device.id == dst_device.id);
       TINY_LLM_CUDA_CHECK(
-          tiny_llm::CudaError,
+          CudaError,
           cudaMemcpyAsync(dst_ptr, src_ptr, size, cudaMemcpyDeviceToDevice,
                           ThreadCudaContexts::GetContext().stream));
       return;
     case DeviceType::kCudaHost:
     case DeviceType::kCpu:
       TINY_LLM_CUDA_CHECK(
-          tiny_llm::CudaError,
+          CudaError,
           cudaMemcpyAsync(dst_ptr, src_ptr, size, cudaMemcpyDeviceToHost,
                           ThreadCudaContexts::GetContext().stream));
       return;
@@ -63,7 +62,7 @@ void copy_data(const void *src_ptr, Device src_device, void *dst_ptr,
     break;
   }
 
-  TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
+  TINY_LLM_THROW_ERROR(RuntimeError,
                        "Copy from [{}:{}] to [{}:{}] not implemented.",
                        to_string(src_device.type), src_device.id,
                        to_string(dst_device.type), dst_device.id);

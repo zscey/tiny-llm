@@ -73,7 +73,7 @@ void arithmetic(const float *left, float right, float *dst, size_t element_size,
   case ArithmeticType::kSub:
     RUN_KERNEL(ArithmeticType::kSub);
   case ArithmeticType::kDiv:
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, right != 0.F);
+    TINY_LLM_CHECK(InvalidArgumentError, right != 0.F);
     right = 1.F / right;
     RUN_KERNEL(ArithmeticType::kMul);
   }

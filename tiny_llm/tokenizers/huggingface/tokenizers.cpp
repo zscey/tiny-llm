@@ -30,9 +30,9 @@ auto tokenizer_vocab_size(TokenizerHandle *handle) -> size_t;
 
 namespace tiny_llm {
 HuggingfaceTokenizer::HuggingfaceTokenizer(const std::string &path) {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, !path.empty());
+  TINY_LLM_CHECK(InvalidArgumentError, !path.empty());
   handle_ = tokenizer_init(path.c_str());
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, handle_);
+  TINY_LLM_CHECK(RuntimeError, handle_);
 }
 
 HuggingfaceTokenizer::HuggingfaceTokenizer(
