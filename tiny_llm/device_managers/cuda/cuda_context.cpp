@@ -36,7 +36,7 @@ auto CudaContextAllocator::Instance() -> CudaContextAllocator & {
 
 CudaContextAllocator::CudaContextAllocator() : impl_(std::make_unique<Impl>()) {
   int32_t dev_num{};
-  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDeviceCount(&dev_num));
+  TINY_LLM_CUDA_CHECK(CudaError, cudaGetDeviceCount(&dev_num));
 
   CudaDeviceSwitchGuard guard(-1);
 
@@ -46,9 +46,9 @@ CudaContextAllocator::CudaContextAllocator() : impl_(std::make_unique<Impl>()) {
         impl_->resources.emplace_back(std::make_unique<ContextResources>());
     cur_resource->pos = 0;
 
-    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaSetDevice(dev_id));
+    TINY_LLM_CUDA_CHECK(CudaError, cudaSetDevice(dev_id));
     for (auto &stream : cur_resource->stream_pool) {
-      TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaStreamCreate(&stream));
+      TINY_LLM_CUDA_CHECK(CudaError, cudaStreamCreate(&stream));
     }
   }
 }
@@ -57,7 +57,7 @@ CudaContextAllocator::~CudaContextAllocator() noexcept = default;
 
 auto CudaContextAllocator::CreateCudaContext(int32_t dev_id) -> CudaContext {
   if (dev_id < 0) {
-    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
+    TINY_LLM_CUDA_CHECK(CudaError, cudaGetDevice(&dev_id));
   }
   auto &instance = Instance();
   check_dev_id(dev_id, static_cast<int32_t>(instance.impl_->resources.size()));
@@ -83,7 +83,7 @@ public:
 
 ThreadCudaContexts::ThreadCudaContexts() : impl_(std::make_unique<Impl>()) {
   int32_t dev_num{};
-  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDeviceCount(&dev_num));
+  TINY_LLM_CUDA_CHECK(CudaError, cudaGetDeviceCount(&dev_num));
 
   impl_->contexts.resize(dev_num);
 };
@@ -104,7 +104,7 @@ void ThreadCudaContexts::Push(CudaContext cuda_context) {
 void ThreadCudaContexts::Pop(int32_t dev_id) {
   auto &instance = ThreadInstance();
   if (dev_id < 0) {
-    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
+    TINY_LLM_CUDA_CHECK(CudaError, cudaGetDevice(&dev_id));
   }
   check_dev_id(dev_id, static_cast<int32_t>(instance.impl_->contexts.size()));
 
@@ -117,7 +117,7 @@ void ThreadCudaContexts::Pop(int32_t dev_id) {
 auto ThreadCudaContexts::GetContext() -> CudaContext {
   auto &instance = ThreadInstance();
   int32_t dev_id{};
-  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
+  TINY_LLM_CUDA_CHECK(CudaError, cudaGetDevice(&dev_id));
 
   auto &cur_contexts = instance.impl_->contexts.at(dev_id);
   if (cur_contexts.empty()) {
@@ -129,17 +129,17 @@ auto ThreadCudaContexts::GetContext() -> CudaContext {
 
 void ThreadCudaContexts::Synchronize() {
   int32_t dev_id{};
-  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&dev_id));
+  TINY_LLM_CUDA_CHECK(CudaError, cudaGetDevice(&dev_id));
 
   auto &cur_contexts = ThreadInstance().impl_->contexts.at(dev_id);
   if (!cur_contexts.empty()) {
-    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError,
+    TINY_LLM_CUDA_CHECK(CudaError,
                         cudaStreamSynchronize(cur_contexts.top().stream));
   }
 }
 
 void ThreadCudaContexts::SynchronizeDevice() {
-  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaDeviceSynchronize());
+  TINY_LLM_CUDA_CHECK(CudaError, cudaDeviceSynchronize());
 }
 
 // ========================== ThreadCudaContextsGuard ==========================

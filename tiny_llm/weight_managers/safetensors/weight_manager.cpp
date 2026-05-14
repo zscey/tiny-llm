@@ -18,8 +18,7 @@ auto u32_to_dtype(uint32_t dtype) -> DataType {
     return DataType::kFloat32;
   }
 
-  TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError, "Unsupported u32 data type: {}.",
-                       dtype);
+  TINY_LLM_THROW_ERROR(RuntimeError, "Unsupported u32 data type: {}.", dtype);
 }
 
 auto to_slice_view(const SliceViewRaw &raw) -> SliceView {
@@ -51,9 +50,9 @@ void safetensor_free(SafeTensorContext *ctx);
 
 namespace tiny_llm {
 SafeTensorWeightManager::SafeTensorWeightManager(const std::string &path) {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, !path.empty());
+  TINY_LLM_CHECK(InvalidArgumentError, !path.empty());
   ctx_ = safetensor_init(path.c_str());
-  TINY_LLM_CHECK(tiny_llm::RuntimeError, ctx_);
+  TINY_LLM_CHECK(RuntimeError, ctx_);
 }
 
 SafeTensorWeightManager::SafeTensorWeightManager(
@@ -74,7 +73,7 @@ auto SafeTensorWeightManager::operator=(
 [[nodiscard]] auto
 SafeTensorWeightManager::get_tensor(const std::string &name) const
     -> SliceView {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, !name.empty());
+  TINY_LLM_CHECK(InvalidArgumentError, !name.empty());
   auto iter = user_defined_weights_.find(name);
   if (iter != user_defined_weights_.end()) {
     const auto &tensor = iter->second;
@@ -88,7 +87,7 @@ SafeTensorWeightManager::get_tensor(const std::string &name) const
   auto raw = safetensor_get_tensor(ctx_, name.c_str());
   if (raw.data == nullptr || raw.data_len == 0) {
     TINY_LLM_THROW_ERROR(
-        tiny_llm::RuntimeError,
+        RuntimeError,
         "Tensor ({}) cannot be found in the current SafeTensorWeightManager.",
         name);
   }
@@ -97,12 +96,11 @@ SafeTensorWeightManager::get_tensor(const std::string &name) const
 
 void SafeTensorWeightManager::set_tensor(std::string name,
                                          SliceView slice_view) {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, slice_view.data != nullptr);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, slice_view.data_len > 0);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 get_element_size(slice_view.shape) *
-                         type_size(slice_view.dtype) ==
-                     slice_view.data_len);
+  TINY_LLM_CHECK(InvalidArgumentError, slice_view.data != nullptr);
+  TINY_LLM_CHECK(InvalidArgumentError, slice_view.data_len > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, get_element_size(slice_view.shape) *
+                                               type_size(slice_view.dtype) ==
+                                           slice_view.data_len);
 
   auto &tensor =
       user_defined_weights_

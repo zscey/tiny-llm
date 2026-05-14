@@ -65,7 +65,7 @@ auto CudaAllocator::Allocate(std::size_t size) -> Buffer {
 
   void *ptr{};
   if (size > 0) {
-    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError,
+    TINY_LLM_CUDA_CHECK(CudaError,
                         cudaMallocAsync(&ptr, size, cuda_context.stream));
     PtrInfo::insert(ptr, cuda_context);
   }
@@ -88,7 +88,7 @@ void cuda_host_deleter(void *ptr) {
 auto CudaHostAllocator::Allocate(std::size_t size) -> Buffer {
   void *ptr{};
   if (size > 0) {
-    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaMallocHost(&ptr, size));
+    TINY_LLM_CUDA_CHECK(CudaError, cudaMallocHost(&ptr, size));
   }
 
   return {

@@ -43,6 +43,7 @@ cc_test(
         "//tiny_llm/ops/cpu:cpu_ops",
         "//tiny_llm/parser:llama_parser",
         "//tiny_llm/runtime:greedy_memory_planer",
+        "//tiny_llm/runtime:page_pool",
         "//tiny_llm/tensor",
         "//tiny_llm/thread_pool",
         "//tiny_llm/tokenizers/huggingface:tokenizers",

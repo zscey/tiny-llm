@@ -35,7 +35,7 @@ void embedding(const uint32_t *src, const float *emb_weights, float *dst,
     return;
   }
 
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, dim > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, dim > 0);
 
   auto padded_dim = CalBlockNum(dim, kTile) * kTile;
   embedding_kernel<<<CalBlockNum(element_size * padded_dim,

@@ -51,15 +51,12 @@ public:
 
 inline void check_params(const Tensor &logit, const Tensor &id,
                          const Tensor &valid_size) {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 logit.dtype() == DataType::kFloat32);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 id.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 valid_size.dtype() == DataType::kUint32);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, logit.shape().size() == 2);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, logit.shape() == id.shape());
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+  TINY_LLM_CHECK(InvalidArgumentError, logit.dtype() == DataType::kFloat32);
+  TINY_LLM_CHECK(InvalidArgumentError, id.dtype() == DataType::kUint32);
+  TINY_LLM_CHECK(InvalidArgumentError, valid_size.dtype() == DataType::kUint32);
+  TINY_LLM_CHECK(InvalidArgumentError, logit.shape().size() == 2);
+  TINY_LLM_CHECK(InvalidArgumentError, logit.shape() == id.shape());
+  TINY_LLM_CHECK(InvalidArgumentError,
                  valid_size.shape() ==
                      std::vector<int64_t>{logit.shape().at(0)});
 }

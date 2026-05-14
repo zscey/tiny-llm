@@ -5,9 +5,9 @@
 
 namespace tiny_llm {
 CudaDeviceSwitchGuard::CudaDeviceSwitchGuard(int32_t target_dev) {
-  TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaGetDevice(&origin_dev_));
+  TINY_LLM_CUDA_CHECK(CudaError, cudaGetDevice(&origin_dev_));
   if (target_dev >= 0 && origin_dev_ != target_dev) {
-    TINY_LLM_CUDA_CHECK(tiny_llm::CudaError, cudaSetDevice(target_dev));
+    TINY_LLM_CUDA_CHECK(CudaError, cudaSetDevice(target_dev));
   }
 }
 

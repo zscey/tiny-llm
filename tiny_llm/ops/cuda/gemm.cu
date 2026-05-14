@@ -296,7 +296,7 @@ void gemm_row_major(const float *input, const float *weight, const float *bias,
     return;
   }
 
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
+  TINY_LLM_CHECK(InvalidArgumentError, bias == nullptr);
   if (m == 0 || d == 0 || n == 0) {
     return;
   }
@@ -317,8 +317,8 @@ void gemm_row_major_lt(const float *input, const float *weight,
     return;
   }
 
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, q_start + q <= q_end);
+  TINY_LLM_CHECK(InvalidArgumentError, bias == nullptr);
+  TINY_LLM_CHECK(InvalidArgumentError, q_start + q <= q_end);
   if (b == 0 || q == 0 || d == 0 || out_head == 0 || out_d == 0) {
     return;
   }
@@ -338,7 +338,7 @@ void gemm_row_major_tl(const float *input, const float *weight,
     return;
   }
 
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
+  TINY_LLM_CHECK(InvalidArgumentError, bias == nullptr);
   if (b == 0 || h == 0 || q == 0 || d == 0 || out_d == 0) {
     return;
   }
@@ -359,8 +359,8 @@ void gemm_row_major_sl(const float *input, const float *weight,
     return;
   }
 
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, bias == nullptr);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, q_start + q <= q_end);
+  TINY_LLM_CHECK(InvalidArgumentError, bias == nullptr);
+  TINY_LLM_CHECK(InvalidArgumentError, q_start + q <= q_end);
   if (b == 0 || q == 0 || d == 0 || n == 0) {
     return;
   }

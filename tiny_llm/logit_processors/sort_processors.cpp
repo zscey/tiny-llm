@@ -56,9 +56,8 @@ void TopKProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
   for (int64_t i = 0; i < batch; ++i) {
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                   valid_size.data<uint32_t>()[i] <= dim);
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+    TINY_LLM_CHECK(InvalidArgumentError, valid_size.data<uint32_t>()[i] <= dim);
+    TINY_LLM_CHECK(InvalidArgumentError,
                    valid_size.data<uint32_t>()[i] >= top_k_);
   }
 
@@ -81,9 +80,9 @@ void TopKProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
 static_assert(LogitProcessor<TopKProcessor>);
 
 TopPProcessor::TopPProcessor(float top_p, uint32_t min_tokens_to_keep) {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, top_p >= 0.F);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, top_p <= 1.F);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, min_tokens_to_keep > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, top_p >= 0.F);
+  TINY_LLM_CHECK(InvalidArgumentError, top_p <= 1.F);
+  TINY_LLM_CHECK(InvalidArgumentError, min_tokens_to_keep > 0);
 
   top_p_ = top_p;
   min_tokens_to_keep_ = min_tokens_to_keep;
@@ -111,9 +110,8 @@ void TopPProcessor::apply(Tensor &logit, Tensor &id, Tensor &valid_size) const {
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
   for (int64_t i = 0; i < batch; ++i) {
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                   valid_size.data<uint32_t>()[i] <= dim);
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
+    TINY_LLM_CHECK(InvalidArgumentError, valid_size.data<uint32_t>()[i] <= dim);
+    TINY_LLM_CHECK(InvalidArgumentError,
                    valid_size.data<uint32_t>()[i] >= min_tokens_to_keep_);
   }
 

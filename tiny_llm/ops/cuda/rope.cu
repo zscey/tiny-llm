@@ -56,9 +56,9 @@ __global__ void apply_rope_inplace_kernel(const float *cos, const float *sin,
 
 void rope(float *cos_dst, float *sin_dst, uint32_t max_len, uint32_t dim,
           double base) {
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, max_len > 0);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, dim > 0);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, (dim & 1U) == 0);
+  TINY_LLM_CHECK(InvalidArgumentError, max_len > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, dim > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, (dim & 1U) == 0);
 
   auto half_dim = dim / 2;
   rope_kernel<<<CalBlockNum(max_len * half_dim, kThreadNum), kThreadNum, 0,
@@ -74,11 +74,10 @@ void apply_rope_inplace(const float *cos, const float *sin,
   if (element_size == 0) {
     return;
   }
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, head_num > 0);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, dim > 0);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, (dim & 1U) == 0);
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                 seq_start + seq_len <= seq_end);
+  TINY_LLM_CHECK(InvalidArgumentError, head_num > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, dim > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, (dim & 1U) == 0);
+  TINY_LLM_CHECK(InvalidArgumentError, seq_start + seq_len <= seq_end);
 
   auto half_dim = dim / 2;
   apply_rope_inplace_kernel<<<CalBlockNum(element_size * half_dim, kThreadNum),

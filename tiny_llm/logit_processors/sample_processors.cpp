@@ -15,10 +15,8 @@ void MultinomialProcessor::apply(Tensor &logit, Tensor &id,
   int64_t batch = logit.shape().at(0);
   int64_t dim = logit.shape().at(1);
   for (int64_t i = 0; i < batch; ++i) {
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                   valid_size.data<uint32_t>()[i] <= dim);
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError,
-                   valid_size.data<uint32_t>()[i] >= 1);
+    TINY_LLM_CHECK(InvalidArgumentError, valid_size.data<uint32_t>()[i] <= dim);
+    TINY_LLM_CHECK(InvalidArgumentError, valid_size.data<uint32_t>()[i] >= 1);
   }
 
   for (int64_t b = 0; b < batch; ++b) {

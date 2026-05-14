@@ -61,7 +61,7 @@ void rms_norm(const float *input, const float *weight, float *dst,
   if (element_size == 0) {
     return;
   }
-  TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, dim > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, dim > 0);
 
   if (dim <= 64) {
     CALL_KERNEL(2);
@@ -80,7 +80,7 @@ void rms_norm(const float *input, const float *weight, float *dst,
     return;
   }
 
-  TINY_LLM_THROW_ERROR(tiny_llm::NotImplementedError,
+  TINY_LLM_THROW_ERROR(NotImplementedError,
                        "The condition `dim={}` is not implemented.", dim);
 }
 // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)

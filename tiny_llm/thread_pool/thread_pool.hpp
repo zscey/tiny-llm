@@ -72,8 +72,7 @@ public:
   auto enqueue(F &&f, Args &&...args)
       -> std::future<std::invoke_result_t<F, Args...>> {
     if (shutting_down_.load(std::memory_order_acquire)) {
-      TINY_LLM_THROW_ERROR(tiny_llm::RuntimeError,
-                           "Enqueue on stopped ThreadPool.");
+      TINY_LLM_THROW_ERROR(RuntimeError, "Enqueue on stopped ThreadPool.");
     }
 
     auto task = std::make_shared<

@@ -16,9 +16,9 @@ public:
   ~TestWeightManager() = default;
 
   [[nodiscard]] auto get_tensor(const std::string &name) const -> SliceView {
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, !name.empty());
+    TINY_LLM_CHECK(InvalidArgumentError, !name.empty());
     auto iter = user_defined_weights_.find(name);
-    TINY_LLM_CHECK(tiny_llm::RuntimeError, iter != user_defined_weights_.end());
+    TINY_LLM_CHECK(RuntimeError, iter != user_defined_weights_.end());
 
     const auto &tensor = iter->second;
     return {.dtype = tensor.dtype(),
@@ -36,10 +36,10 @@ public:
   }
 
   void set_tensor(std::string name, SliceView slice_view) {
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, slice_view.data != nullptr);
-    TINY_LLM_CHECK(tiny_llm::InvalidArgumentError, !slice_view.shape.empty());
+    TINY_LLM_CHECK(InvalidArgumentError, slice_view.data != nullptr);
+    TINY_LLM_CHECK(InvalidArgumentError, !slice_view.shape.empty());
     TINY_LLM_CHECK(
-        tiny_llm::InvalidArgumentError,
+        InvalidArgumentError,
         type_size(slice_view.dtype) *
                 std::accumulate(slice_view.shape.begin(),
                                 slice_view.shape.end(), 1,
