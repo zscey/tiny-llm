@@ -74,4 +74,33 @@ void gemm_row_major_sl(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t q,
                        uint32_t d, uint32_t n, uint32_t q_start,
                        uint32_t q_end);
+
+/**
+ * @brief [Paged] Linear + Transpose
+ *
+ * @param inputs [total_queries, hidden_dim], where
+ * `total_queries=sum(query_num[i])`
+ * @param weight [num_head * head_dim, hidden_dim]
+ * @param bias [num_head * head_dim]
+ * @param page_pool [num_pages, num_head, page_size, head_dim]
+ * @param block_table [num_requests, max_blocks]
+ * @param seq_separator [num_requests]
+ * @param cache_offsets [num_requests]
+ * @param total_queries
+ * @param num_requests
+ * @param hidden_dim
+ * @param num_head
+ * @param head_dim
+ * @param max_blocks
+ * @param page_size
+ */
+void gemm_row_major_lt_paged(const float *inputs, const float *weight,
+                             const float *bias, float *page_pool,
+                             const uint32_t *block_table,
+                             const uint32_t *seq_separator,
+                             const uint32_t *cache_offsets,
+                             uint32_t total_queries, uint32_t num_requests,
+                             uint32_t hidden_dim, uint32_t num_head,
+                             uint32_t head_dim, uint32_t max_blocks,
+                             uint32_t page_size);
 } // namespace tiny_llm::cuda

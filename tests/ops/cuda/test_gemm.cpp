@@ -355,4 +355,92 @@ TEST(CudaOps, GemmSL) {
     EXPECT_FLOAT_EQ(dst_ptr[i], target_ptr[i]);
   }
 }
+
+TEST(CudaOps, GemmLTPaged) {
+  int64_t total_queries = 122;
+  int64_t d = 255;
+  int64_t out_head = 4;
+  int64_t out_dim = 88;
+
+  Device target_dev = {.type = DeviceType::kCuda, .id = 0};
+
+  Tensor input({.type = DeviceType::kCpu}, DataType::kFloat32,
+               {total_queries, d});
+  {
+    auto *input_ptr = input.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(total_queries * d);
+         i < i_end; ++i) {
+      input_ptr[i] = static_cast<float>(i % 100);
+    }
+    input = input.to(target_dev);
+  }
+
+  Tensor weight({.type = DeviceType::kCpu}, DataType::kFloat32,
+                {out_head * out_dim, d});
+  {
+    auto *weight_ptr = weight.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(out_head * out_dim * d);
+         i < i_end; ++i) {
+      weight_ptr[i] = static_cast<float>(i % 100);
+    }
+    weight = weight.to(target_dev);
+  }
+
+  Tensor dst(target_dev, DataType::kFloat32, {4, out_head, 32, out_dim});
+
+  // 122 queries split to [61, 38, 23]
+  Tensor block_table({.type = DeviceType::kCpu}, DataType::kUint32, {3, 2});
+  {
+    auto *block_table_ptr = block_table.data<uint32_t>();
+    block_table_ptr[0] = 0;
+    block_table_ptr[1] = 1;
+    block_table_ptr[2] = 1;
+    block_table_ptr[3] = 2;
+    block_table_ptr[4] = 3;
+    block_table_ptr[5] = 3;
+    block_table = block_table.to(target_dev);
+  }
+  Tensor seq_separator({.type = DeviceType::kCpu}, DataType::kUint32, {3});
+  {
+    auto *seq_separator_ptr = seq_separator.data<uint32_t>();
+    seq_separator_ptr[0] = 0;
+    seq_separator_ptr[1] = 61;
+    seq_separator_ptr[2] = 99;
+    seq_separator = seq_separator.to(target_dev);
+  }
+  Tensor cache_offsets({.type = DeviceType::kCpu}, DataType::kUint32, {3});
+  {
+    auto *cache_offsets_ptr = cache_offsets.data<uint32_t>();
+    cache_offsets_ptr[0] = 0;
+    cache_offsets_ptr[1] = 29;
+    cache_offsets_ptr[2] = 3;
+    cache_offsets = cache_offsets.to(target_dev);
+  }
+
+  cuda::gemm_row_major_lt_paged(
+      input.data<float>(), weight.data<float>(), nullptr, dst.data<float>(),
+      block_table.data<uint32_t>(), seq_separator.data<uint32_t>(),
+      cache_offsets.data<uint32_t>(), 122, 3, 255, 4, 88, 2, 32);
+  auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+  ThreadCudaContexts::Synchronize();
+
+  SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/gemm_b2q61d255oh4od88qs3qe77.safetensors"));
+  const auto *dst_ptr = cpu_dst.data<float>();
+  const auto *target_ptr =
+      reinterpret_cast<const float *>(wm.get_tensor("res").data);
+  for (size_t q_idx = 0; q_idx < 122; ++q_idx) {
+    for (size_t h_idx = 0; h_idx < 4; ++h_idx) {
+      const auto *cur_dst_ptr =
+          dst_ptr + ((((q_idx / 32 * 4) + h_idx) * 32 + q_idx % 32) * 88);
+      const auto *cur_target_ptr =
+          target_ptr +
+          ((((q_idx / 61) * 4 + h_idx) * 77 + 3 + q_idx % 61) * 88);
+      for (size_t i = 0; i < 88; ++i) {
+        EXPECT_FLOAT_EQ(cur_dst_ptr[i], cur_target_ptr[i]);
+      }
+    }
+  }
+}
 } // namespace tiny_llm
