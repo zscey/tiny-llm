@@ -389,15 +389,18 @@ TEST(CudaOps, GemmLTPaged) {
   Tensor dst(target_dev, DataType::kFloat32, {4, out_head, 32, out_dim});
 
   // 122 queries split to [61, 38, 23]
-  Tensor block_table({.type = DeviceType::kCpu}, DataType::kUint32, {3, 2});
+  Tensor block_table({.type = DeviceType::kCpu}, DataType::kUint32, {3, 3});
   {
     auto *block_table_ptr = block_table.data<uint32_t>();
     block_table_ptr[0] = 0;
     block_table_ptr[1] = 1;
-    block_table_ptr[2] = 1;
-    block_table_ptr[3] = 2;
-    block_table_ptr[4] = 3;
+    block_table_ptr[2] = 8;
+    block_table_ptr[3] = 1;
+    block_table_ptr[4] = 2;
     block_table_ptr[5] = 3;
+    block_table_ptr[6] = 3;
+    block_table_ptr[7] = 8;
+    block_table_ptr[8] = 8;
     block_table = block_table.to(target_dev);
   }
   Tensor seq_separator({.type = DeviceType::kCpu}, DataType::kUint32, {3});
@@ -420,7 +423,7 @@ TEST(CudaOps, GemmLTPaged) {
   cuda::gemm_row_major_lt_paged(
       input.data<float>(), weight.data<float>(), nullptr, dst.data<float>(),
       block_table.data<uint32_t>(), seq_separator.data<uint32_t>(),
-      cache_offsets.data<uint32_t>(), 122, 3, 255, 4, 88, 2, 32);
+      cache_offsets.data<uint32_t>(), 122, 3, 255, 4, 88, 3, 32);
   auto cpu_dst = dst.to({.type = DeviceType::kCpu});
 
   ThreadCudaContexts::Synchronize();
