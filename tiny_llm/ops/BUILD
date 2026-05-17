@@ -8,3 +8,12 @@ cc_library(
         "arithmetic_type.hpp",
     ],
 )
+
+cc_library(
+    name = "details",
+    hdrs = ["details.hpp"],
+    deps = select({
+        "//platforms/device:cuda": ["@cuda//:cuda_runtime"],
+        "//conditions:default": [],
+    }),
+)

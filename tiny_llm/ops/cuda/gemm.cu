@@ -2,6 +2,7 @@
 #include "tiny_llm/common/exception.hpp"
 #include "tiny_llm/ops/cuda/gemm.hpp"
 #include "tiny_llm/ops/cuda/gemm_q1_helper.hpp"
+#include "tiny_llm/ops/details.hpp"
 #include <cstddef>
 
 namespace tiny_llm::cuda {
@@ -376,26 +377,6 @@ void gemm_row_major_sl(const float *input, const float *weight,
 namespace {
 constexpr uint32_t kPageSize = 32;
 
-/// @brief find the max index in the range [beg, end) which satisfy
-/// `seq_separator[index] <= query_idx`
-__device__ auto get_request_idx(uint32_t query_idx,
-                                const uint32_t *seq_separator, uint32_t beg,
-                                uint32_t end) -> uint32_t {
-  uint32_t res{beg};
-
-  while (beg < end) {
-    auto mid = beg + ((end - beg) / 2);
-    if (seq_separator[mid] <= query_idx) {
-      res = mid;
-      beg = mid + 1;
-    } else {
-      end = mid;
-    }
-  }
-
-  return res;
-}
-
 __device__ void write_dst_lt_paged(const float *res, float *page_pool,
                                    const uint32_t *block_table,
                                    const uint32_t *seq_separator,
@@ -408,8 +389,8 @@ __device__ void write_dst_lt_paged(const float *res, float *page_pool,
   for (uint32_t ty = 0; ty < kTileY; ++ty) {
     auto dst_row =
         (blockIdx.y * kThreadNumY * kTileY) + (ty * kThreadNumY) + threadIdx.y;
-    request_idx =
-        get_request_idx(dst_row, seq_separator, request_idx, num_requests);
+    request_idx = detail::get_request_idx(dst_row, seq_separator, request_idx,
+                                          num_requests);
     for (uint32_t tx = 0; tx < kTileX; ++tx) {
       auto dst_col = (blockIdx.x * kThreadNumX * kTileX) + (tx * kThreadNumX) +
                      threadIdx.x;
