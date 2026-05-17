@@ -36,6 +36,7 @@ cuda_library(
     deps = [
         ":cuda_op_common",
         "//tiny_llm/common",
+        "//tiny_llm/ops:details",
         "@cuda//:cub",
         "@cuda//:libcudacxx",
     ],
@@ -47,6 +48,7 @@ cuda_library(
     hdrs = ["rope.hpp"],
     deps = [
         ":cuda_op_common",
+        "//tiny_llm/ops:details",
     ],
 )
 
