@@ -175,7 +175,7 @@ __global__ void flash_attn_kernel(const float *query, const float *key,
       local_m = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
                     .Max(local_m);
       local_m = ::cuda::device::warp_shuffle_idx(local_m, 0);
-      local_m = std::max(local_m, global_m[warp_iter]);
+      local_m = ::max(local_m, global_m[warp_iter]);
       float local_l{};
       for (float &cur_s : local_s) {
         cur_s = ::exp(cur_s - local_m);
@@ -406,7 +406,7 @@ __global__ void flash_attn_paged_kernel(
       local_m = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
                     .Max(local_m);
       local_m = ::cuda::device::warp_shuffle_idx(local_m, 0);
-      local_m = std::max(local_m, global_m[warp_iter]);
+      local_m = ::max(local_m, global_m[warp_iter]);
       float local_l{};
       for (float &cur_s : local_s) {
         cur_s = ::exp(cur_s - local_m);
