@@ -39,7 +39,8 @@ auto main(int argc, char **argv) -> int32_t {
          .dtype = tiny_llm::DataType::kFloat32,
          .device = {.type = tiny_llm::DeviceType::kCuda,
                     .id = static_cast<tiny_llm::DeviceId>(FLAGS_device)},
-         .batch = 1});
+         .paged = false,
+         .max_requests = 1});
 
     std::cout << "\n>>> Interactive Mode (Multi-line enabled) <<<\n";
     std::cout << ">>> Enter your prompt. Enter a blank line to end the current "
