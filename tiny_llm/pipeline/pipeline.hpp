@@ -15,7 +15,8 @@ public:
     ModelType model_type{};
     DataType dtype{};
     Device device{};
-    uint32_t batch{};
+    bool paged{false};
+    uint32_t max_requests{};
   };
 
   Pipeline(const std::string &model_path, PipelineConfig config);
@@ -27,6 +28,8 @@ public:
       -> std::vector<std::string>;
 
 private:
+  bool paged_;
+  uint32_t max_requests_;
   std::unique_ptr<TokenizerWrapper> tokenizer_;
   std::unique_ptr<IRuntime> runtime_;
   std::unique_ptr<Tensor> output_;
