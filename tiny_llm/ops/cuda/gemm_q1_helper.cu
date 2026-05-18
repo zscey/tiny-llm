@@ -95,6 +95,33 @@ gemm_row_major_sl_no_bias_kernel(const float *input, const float *weight,
     }
   }
 }
+
+__global__ void gemm_row_major_s1l_paged_no_bias_kernel(
+    const float *input, const float *weight, float *dst,
+    const uint32_t *seq_separator, uint32_t d, uint32_t n) {
+  __shared__ typename ::cub::WarpReduce<float>::TempStorage
+      temp_storage[kWarpNumPerBlock];
+
+  auto cur_request = blockIdx.y;
+  auto cur_n = (blockIdx.x * kWarpNumPerBlock) + (threadIdx.x / kWarpSize);
+  if (cur_n < n) {
+    const auto *cur_input =
+        input + (static_cast<size_t>(seq_separator[cur_request + 1] - 1) * d);
+    const auto *cur_weight = weight + (static_cast<size_t>(cur_n) * d);
+
+    float res{};
+    for (uint32_t i = threadIdx.x % kWarpSize; i < d; i += kWarpSize) {
+      res += cur_input[i] * cur_weight[i];
+    }
+
+    res = ::cub::WarpReduce<float>(temp_storage[threadIdx.x / kWarpSize])
+              .Sum(res);
+
+    if (threadIdx.x % 32 == 0) {
+      dst[(cur_request * n) + cur_n] = res;
+    }
+  }
+}
 // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 } // namespace
 
@@ -152,5 +179,20 @@ void gemm_row_major_sl(const float *input, const float *weight,
                                      kThreadNum, 0,
                                      ThreadCudaContexts::GetContext().stream>>>(
       input, weight, dst, b, d, n, q_start, q_end);
+}
+
+void gemm_row_major_s1l_paged(const float *input, const float *weight,
+                              const float *bias, float *dst,
+                              const uint32_t *seq_separator,
+                              uint32_t num_requests, uint32_t d, uint32_t n) {
+  TINY_LLM_CHECK(InvalidArgumentError, bias == nullptr);
+  TINY_LLM_CHECK(InvalidArgumentError, num_requests > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, d > 0);
+  TINY_LLM_CHECK(InvalidArgumentError, n > 0);
+
+  gemm_row_major_s1l_paged_no_bias_kernel<<<
+      dim3{CalBlockNum(n, kWarpNumPerBlock), num_requests}, kThreadNum, 0,
+      ThreadCudaContexts::GetContext().stream>>>(input, weight, dst,
+                                                 seq_separator, d, n);
 }
 } // namespace tiny_llm::cuda::q1

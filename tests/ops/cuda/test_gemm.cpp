@@ -446,4 +446,62 @@ TEST(CudaOps, GemmLTPaged) {
     }
   }
 }
+
+TEST(CudaOps, GemmS1LPaged) {
+  int64_t m = 127;
+  int64_t d = 255;
+  int64_t n = 353;
+  Device target_dev = {.type = DeviceType::kCuda, .id = 0};
+
+  Tensor input({.type = DeviceType::kCpu}, DataType::kFloat32, {m, d});
+  {
+    auto *input_ptr = input.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(m * d); i < i_end; ++i) {
+      input_ptr[i] = static_cast<float>(i % 100);
+    }
+    input = input.to(target_dev);
+  }
+
+  Tensor weight({.type = DeviceType::kCpu}, DataType::kFloat32, {n, d});
+  {
+    auto *weight_ptr = weight.data<float>();
+    for (size_t i = 0, i_end = static_cast<size_t>(n * d); i < i_end; ++i) {
+      weight_ptr[i] = static_cast<float>(i % 100);
+    }
+    weight = weight.to(target_dev);
+  }
+
+  // 3 request with length [33, 63, 31]
+  Tensor seq_separator({.type = DeviceType::kCpu}, DataType::kUint32, {4});
+  {
+    auto *seq_separator_ptr = seq_separator.data<uint32_t>();
+    seq_separator_ptr[0] = 0;
+    seq_separator_ptr[1] = 33;
+    seq_separator_ptr[2] = 96;
+    seq_separator_ptr[3] = 127;
+    seq_separator = seq_separator.to(target_dev);
+  }
+  Tensor dst(target_dev, DataType::kFloat32, {3, n});
+
+  cuda::gemm_row_major_s1l_paged(input.data<float>(), weight.data<float>(),
+                                 nullptr, dst.data<float>(),
+                                 seq_separator.data<uint32_t>(), 3, d, n);
+  auto cpu_dst = dst.to({.type = DeviceType::kCpu});
+
+  ThreadCudaContexts::Synchronize();
+
+  SafeTensorWeightManager wm(utils::BazelRunfile::RLocation(
+      "tiny_llm/tests/datas/gemm_m127d255n353.safetensors"));
+  const auto *dst_ptr = cpu_dst.data<float>();
+  const auto *target_ptr =
+      reinterpret_cast<const float *>(wm.get_tensor("res").data);
+  std::vector<int64_t> check_point{32, 95, 126};
+  for (int64_t i = 0; i < 3; ++i) {
+    const auto *cur_dst_ptr = dst_ptr + (i * n);
+    const auto *cur_target_ptr = target_ptr + (check_point[i] * n);
+    for (int64_t j = 0; j < n; ++j) {
+      EXPECT_FLOAT_EQ(cur_dst_ptr[i], cur_target_ptr[i]);
+    }
+  }
+}
 } // namespace tiny_llm
