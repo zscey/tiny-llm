@@ -52,13 +52,17 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config)
       llama_parser(json),
       {.named_shape_ranges = {
            {"token_ids",
-            {.min_shape = {config.max_requests, 1},
-             .max_shape = {config.max_requests,
-                           json["max_position_embeddings"].get<uint32_t>()}}},
+            {.min_shape = {1, 1},
+             .max_shape = {1,
+                           static_cast<uint32_t>(config.max_requests *
+                                                 json["max_position_embeddings"]
+                                                     .get<uint32_t>())}}},
            {"pos_ids",
-            {.min_shape = {config.max_requests, 1},
-             .max_shape = {config.max_requests, json["max_position_embeddings"]
-                                                    .get<uint32_t>()}}}}});
+            {.min_shape = {1, 1},
+             .max_shape = {
+                 1, static_cast<uint32_t>(
+                        config.max_requests *
+                        json["max_position_embeddings"].get<uint32_t>())}}}}});
   // TODO(hao.lin): unify runtime creation
   WeightManagerWrapper wm(
       SafeTensorWeightManager(model_root / "model.safetensors"));
