@@ -294,18 +294,17 @@ __device__ auto get_shift(uint32_t head_idx, uint32_t seq_idx, uint32_t seq_len,
 }
 
 /**
- * @brief Fetch page data.
+ * @brief
  *
  * @param page_pool [num_page, num_head, 32, head_dim]
- * @param to [fetch_page_num * 32, to_step]
+ * @param to [row_num, to_step]
  * @param page_ids
  * @param start_page_id
- * @param fetch_page_num
+ * @param row_num
  * @param head_idx
  * @param num_head
  * @param head_dim
  * @param to_step
- * @return __device__
  */
 __device__ void fetch_page_data(const float *page_pool, float *to,
                                 const uint32_t *page_ids,
