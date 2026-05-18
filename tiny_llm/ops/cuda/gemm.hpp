@@ -81,7 +81,7 @@ void gemm_row_major_sl(const float *input, const float *weight,
  * @param inputs [total_queries, hidden_dim], where
  * `total_queries=sum(query_num[i])`
  * @param weight [num_head * head_dim, hidden_dim]
- * @param bias [num_head * head_dim]
+ * @param bias [num_head * head_dim] or empty
  * @param page_pool [num_pages, num_head, page_size, head_dim]
  * @param block_table [num_requests, max_blocks]
  * @param seq_separator [num_requests]
@@ -109,7 +109,7 @@ void gemm_row_major_lt_paged(const float *inputs, const float *weight,
  *
  * @param input [total_queries, d], where `total_queries=sum(query_num[i])`
  * @param weight [n, d]
- * @param bias [n]
+ * @param bias [n] or empty
  * @param dst [num_requests, n]
  * @param seq_separator [num_requests + 1]
  * @param num_requests

@@ -75,7 +75,7 @@ void gemm_row_major_sl(const float *input, const float *weight,
  *
  * @param input [total_queries, d], where `total_queries=sum(query_num[i])`
  * @param weight [n, d]
- * @param bias [n]
+ * @param bias [n] or empty
  * @param dst [num_requests, n]
  * @param seq_separator [num_requests + 1]
  * @param num_requests
