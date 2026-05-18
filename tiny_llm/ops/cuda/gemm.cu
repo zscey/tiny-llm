@@ -483,5 +483,13 @@ void gemm_row_major_lt_paged(const float *inputs, const float *weight,
       inputs, weight, page_pool, block_table, seq_separator, cache_offsets,
       total_queries, num_requests, hidden_dim, num_head, head_dim, max_blocks);
 }
+
+void gemm_row_major_s1l_paged(const float *input, const float *weight,
+                              const float *bias, float *dst,
+                              const uint32_t *seq_separator,
+                              uint32_t num_requests, uint32_t d, uint32_t n) {
+  q1::gemm_row_major_s1l_paged(input, weight, bias, dst, seq_separator,
+                               num_requests, d, n);
+}
 // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
 } // namespace tiny_llm::cuda

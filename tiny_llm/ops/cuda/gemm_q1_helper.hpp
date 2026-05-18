@@ -69,4 +69,21 @@ void gemm_row_major_tl(const float *input, const float *weight,
 void gemm_row_major_sl(const float *input, const float *weight,
                        const float *bias, float *dst, uint32_t b, uint32_t d,
                        uint32_t n, uint32_t q_start, uint32_t q_end);
+
+/**
+ * @brief [Paged] Slice (-1) + Linear
+ *
+ * @param input [total_queries, d], where `total_queries=sum(query_num[i])`
+ * @param weight [n, d]
+ * @param bias [n] or empty
+ * @param dst [num_requests, n]
+ * @param seq_separator [num_requests + 1]
+ * @param num_requests
+ * @param d
+ * @param n
+ */
+void gemm_row_major_s1l_paged(const float *input, const float *weight,
+                              const float *bias, float *dst,
+                              const uint32_t *seq_separator,
+                              uint32_t num_requests, uint32_t d, uint32_t n);
 } // namespace tiny_llm::cuda::q1
