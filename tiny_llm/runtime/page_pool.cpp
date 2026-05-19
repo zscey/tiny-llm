@@ -18,10 +18,10 @@ PagePool::PagePool(PagePoolConfig config) {
   v_buffer_ = Tensor({.type = config.device_type}, config.data_type,
                      tensor_shape, true);
 
-  auto page_id = static_cast<int32_t>(config.num_pages) - 1;
+  auto page_id = config.num_pages - 1;
   free_list_.resize(config.num_pages);
   std::ranges::generate(free_list_,
-                        [&page_id]() -> int32_t { return page_id--; });
+                        [&page_id]() -> uint32_t { return page_id--; });
 }
 
 auto PagePool::k_pool_ptr() -> void * { return k_buffer_.data(); }
@@ -29,10 +29,10 @@ auto PagePool::k_pool_ptr() -> void * { return k_buffer_.data(); }
 auto PagePool::v_pool_ptr() -> void * { return v_buffer_.data(); }
 
 auto PagePool::allocate_pages(uint32_t num_logical_pages)
-    -> std::vector<int32_t> {
+    -> std::vector<uint32_t> {
   TINY_LLM_CHECK(InvalidArgumentError, num_logical_pages <= free_list_.size());
 
-  std::vector<int32_t> phys_pages;
+  std::vector<uint32_t> phys_pages;
   phys_pages.reserve(num_logical_pages);
   for (uint32_t i = 0; i < num_logical_pages; ++i) {
     phys_pages.emplace_back(free_list_.back());
@@ -42,7 +42,7 @@ auto PagePool::allocate_pages(uint32_t num_logical_pages)
   return phys_pages;
 }
 
-void PagePool::free_pages(std::span<const int32_t> page_ids) {
+void PagePool::free_pages(std::span<const uint32_t> page_ids) {
   TINY_LLM_CHECK(RuntimeError,
                  std::ranges::all_of(page_ids, [this](int32_t id) -> bool {
                    return std::ranges::find(free_list_, id) == free_list_.end();

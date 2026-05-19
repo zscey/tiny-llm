@@ -197,7 +197,9 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
         auto *token_ids_ptr = token_ids.data<uint32_t>();
         auto *pos_ids_ptr = pos_ids.data<uint32_t>();
         for (int64_t i = 0; i < prompt_size; ++i) {
-          auto next_token = indexes_ptr[i * vocab_size];
+          auto next_token = (unfinished_ptr[i] == 1)
+                                ? indexes_ptr[i * vocab_size]
+                                : eos_token_id_;
           unfinished_ptr[i] =
               static_cast<uint32_t>(next_token != eos_token_id_);
           generated_tokens.at(i).emplace_back(next_token);

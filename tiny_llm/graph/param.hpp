@@ -59,6 +59,8 @@ public:
   uint32_t kv_head{};
   bool bias{false};
   uint32_t max_len{};
+
+  bool paged{false};
 };
 
 // TODO(hao.lin): add SliceParam explicitly
