@@ -30,8 +30,8 @@ public:
   auto k_pool_ptr() -> void *;
   auto v_pool_ptr() -> void *;
 
-  auto allocate_pages(uint32_t num_logical_pages) -> std::vector<int32_t>;
-  void free_pages(std::span<const int32_t> page_ids);
+  auto allocate_pages(uint32_t num_logical_pages) -> std::vector<uint32_t>;
+  void free_pages(std::span<const uint32_t> page_ids);
 
   [[nodiscard]] auto free_count() const -> uint32_t;
   [[nodiscard]] auto total_pages() const -> uint32_t;
@@ -39,7 +39,7 @@ public:
 private:
   Tensor k_buffer_{{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32};
   Tensor v_buffer_{{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32};
-  std::vector<int32_t> free_list_;
+  std::vector<uint32_t> free_list_;
 };
 
 } // namespace tiny_llm
