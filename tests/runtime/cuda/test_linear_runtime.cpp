@@ -346,7 +346,7 @@ TEST(Runtime, SliceLinearPaged) {
     EXPECT_TRUE(cuda_runtime.output_names() == std::vector<std::string>{"out"});
 
     {
-      std::vector<cuda::RequestMeta> request_metas(3);
+      std::vector<RequestMeta> request_metas(3);
       request_metas.at(0).seq_len = 2;
       request_metas.at(1).seq_len = 3;
       request_metas.at(2).seq_len = 5;

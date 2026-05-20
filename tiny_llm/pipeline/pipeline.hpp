@@ -15,6 +15,7 @@ public:
     ModelType model_type{};
     DataType dtype{};
     Device device{};
+
     bool paged{false};
     uint32_t max_requests{};
   };
@@ -29,7 +30,6 @@ public:
 
 private:
   bool paged_;
-  uint32_t max_requests_;
   std::unique_ptr<TokenizerWrapper> tokenizer_;
   std::unique_ptr<IRuntime> runtime_;
   std::unique_ptr<Tensor> output_;

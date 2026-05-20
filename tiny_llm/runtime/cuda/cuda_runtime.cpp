@@ -769,6 +769,7 @@ void CudaRuntime::bind_request_meta(std::vector<RequestMeta> &request_metas) {
           cpu_block_table_ptr += max_blocks;
         }
         reallocate_and_copy(cpu_block_table, block_table);
+        ThreadCudaContexts::Synchronize();
       }
 
       auto &cur_kernel = std::get<CausalAttentionPagedKernel>(

@@ -13,13 +13,6 @@ struct RuntimeConfig {
   uint32_t max_request_num{1};
 };
 
-struct RequestMeta {
-  uint32_t seq_len{};
-  uint32_t kv_len{};
-  // Don't modify member `kv_pages` manually.
-  std::unordered_map<std::string, std::vector<uint32_t>> kv_pages;
-};
-
 struct RuntimeMeta {
   // name -> {max_blocks, buffer}
   std::unordered_map<std::string, std::tuple<uint32_t, Tensor>> block_tables;
@@ -56,9 +49,9 @@ public:
 
   void set_prefill(bool state) override;
 
-  void bind_request_meta(std::vector<RequestMeta> &request_metas);
+  void bind_request_meta(std::vector<RequestMeta> &request_metas) override;
 
-  void destroy_request_meta(std::vector<RequestMeta> &request_metas);
+  void destroy_request_meta(std::vector<RequestMeta> &request_metas) override;
 
 private:
   CudaPlan plan_;

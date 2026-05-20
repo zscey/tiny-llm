@@ -4,5 +4,5 @@
 #include "tiny_llm/graph/graph.hpp"
 
 namespace tiny_llm {
-auto llama_parser(const nlohmann::json &config) -> Graph;
+auto llama_parser(const nlohmann::json &config, bool paged = false) -> Graph;
 }

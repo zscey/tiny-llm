@@ -26,7 +26,7 @@ auto all_zero(const Tensor &unfinished) -> bool {
 } // namespace
 
 Pipeline::Pipeline(const std::string &model_path, PipelineConfig config)
-    : paged_(config.paged), max_requests_(config.max_requests) {
+    : paged_(config.paged) {
   TINY_LLM_CHECK(InvalidArgumentError,
                  config.model_type == ModelType::kTinyLlama);
   TINY_LLM_CHECK(InvalidArgumentError, config.dtype == DataType::kFloat32);
@@ -49,7 +49,7 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config)
                   json["torch_dtype"].get<std::string>() == "float32"));
   f.close();
   auto plan = cuda::create_cuda_plan(
-      llama_parser(json),
+      llama_parser(json, config.paged),
       {.named_shape_ranges = {
            {"token_ids",
             {.min_shape = {1, 1},
@@ -66,11 +66,13 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config)
   // TODO(hao.lin): unify runtime creation
   WeightManagerWrapper wm(
       SafeTensorWeightManager(model_root / "model.safetensors"));
-  runtime_ = std::make_unique<cuda::CudaRuntime>(std::move(plan), wm);
+  runtime_ = std::make_unique<cuda::CudaRuntime>(
+      std::move(plan), wm,
+      cuda::RuntimeConfig{.max_request_num = config.max_requests});
 
   // output_
   output_ = std::make_unique<Tensor>(
-      Device{.type = DeviceType::kCpu, .id = 0}, DataType::kFloat32,
+      Device{.type = DeviceType::kCudaHost, .id = 0}, DataType::kFloat32,
       std::vector<int64_t>{static_cast<int64_t>(config.max_requests), 1,
                            json["vocab_size"].get<int64_t>()});
 
@@ -92,24 +94,26 @@ Pipeline::Pipeline(const std::string &model_path, PipelineConfig config)
 
   // unfinished_
   unfinished_ = std::make_unique<Tensor>(
-      valid_size_->device(), valid_size_->dtype(), valid_size_->shape());
+      valid_size_->device(), DataType::kUint32, valid_size_->shape());
 }
 
 auto Pipeline::apply(const std::vector<std::string> &prompts,
                      uint32_t max_new_tokens, bool do_sample, float temperature,
                      uint32_t top_k, float top_p) const
     -> std::vector<std::string> {
-  if (!paged_) {
-    TINY_LLM_CHECK(InvalidArgumentError, prompts.size() == 1);
-  }
+  std::vector<RequestMeta> request_metas(prompts.size());
+  auto iter = request_metas.begin();
 
   uint32_t total_queries{};
   std::vector<std::vector<uint32_t>> tokenize_res;
   tokenize_res.reserve(prompts.size());
   for (const auto &prompt : prompts) {
     tokenize_res.emplace_back(tokenizer_->encode(prompt, true));
-    total_queries += static_cast<uint32_t>(tokenize_res.back().size());
+    iter->seq_len = static_cast<uint32_t>(tokenize_res.back().size());
+    total_queries += iter->seq_len;
+    ++iter;
   }
+
   {
     Tensor token_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
                      {1, static_cast<int64_t>(total_queries)});
@@ -125,8 +129,10 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
       pos_ids_ptr += r.size();
     }
 
-    // TODO(hao.lin): call runtime_->set_meta in paged case
     runtime_->set_prefill(true);
+    if (paged_) {
+      runtime_->bind_request_meta(request_metas);
+    }
 
     runtime_->cpu_tensor_copy_to_input("token_ids", token_ids);
     runtime_->cpu_tensor_copy_to_input("pos_ids", pos_ids);
@@ -138,7 +144,12 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
   for (auto &r : generated_tokens) {
     r.reserve(max_new_tokens);
   }
+
   {
+    for (auto &meta : request_metas) {
+      meta.seq_len = 1;
+    }
+
     bool from_prefill{true};
     runtime_->set_prefill(false);
 
@@ -156,10 +167,13 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
     auto vocab_size = output_->shape().back();
     std::vector<int64_t> target_shape{prompt_size, vocab_size};
     Tensor token_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
-                     {prompt_size, 1});
+                     {1, prompt_size});
     Tensor pos_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
-                   {prompt_size, 1});
+                   {1, prompt_size});
 
+    indexes_->reallocate({prompt_size, vocab_size});
+    valid_size_->reallocate({prompt_size});
+    unfinished_->reallocate({prompt_size});
     auto *unfinished_ptr = unfinished_->data<uint32_t>();
     for (int64_t i = 0; i < prompt_size; ++i) {
       unfinished_ptr[i] = 1;
@@ -167,6 +181,9 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
     while (generated_tokens[0].size() < max_new_tokens &&
            !all_zero(*unfinished_)) {
       if (!from_prefill) {
+        if (paged_) {
+          runtime_->bind_request_meta(request_metas);
+        }
         runtime_->cpu_tensor_copy_to_input("token_ids", token_ids);
         runtime_->cpu_tensor_copy_to_input("pos_ids", pos_ids);
         runtime_->execute();
@@ -210,6 +227,8 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
       }
     }
   }
+
+  runtime_->destroy_request_meta(request_metas);
 
   std::vector<std::string> res;
   res.reserve(generated_tokens.size());
