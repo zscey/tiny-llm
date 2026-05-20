@@ -16,6 +16,7 @@ DEFINE_int32(top_k, 50, "Sample from the top K most likely tokens");
 DEFINE_double(top_p, 0.95,
               "Sample from the smallest set of tokens whose cumulative "
               "probability > p (within the range [0, 1])");
+DEFINE_bool(page_mode, false, "Whether to use PagedAttention");
 // NOLINTEND
 
 auto main(int argc, char **argv) -> int32_t {
@@ -39,10 +40,15 @@ auto main(int argc, char **argv) -> int32_t {
          .dtype = tiny_llm::DataType::kFloat32,
          .device = {.type = tiny_llm::DeviceType::kCuda,
                     .id = static_cast<tiny_llm::DeviceId>(FLAGS_device)},
-         .paged = false,
+         .paged = FLAGS_page_mode,
          .max_requests = 1});
 
-    std::cout << "\n>>> Interactive Mode (Multi-line enabled) <<<\n";
+    std::string page_info;
+    if (FLAGS_page_mode) {
+      page_info = "[Page Mode] ";
+    }
+    std::cout << "\n>>> " << page_info
+              << "Interactive Mode (Multi-line enabled) <<<\n";
     std::cout << ">>> Enter your prompt. Enter a blank line to end the current "
                  "input. Enter EOF (Ctrl+D) to exit. <<<\n";
 

@@ -3,9 +3,17 @@
 #include "tiny_llm/common/construct_macros.hpp"
 #include "tiny_llm/tensor/tensor.hpp"
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace tiny_llm {
+struct RequestMeta {
+  uint32_t seq_len{};
+  uint32_t kv_len{};
+  // Don't modify member `kv_pages` manually.
+  std::unordered_map<std::string, std::vector<uint32_t>> kv_pages;
+};
+
 class IRuntime {
 public:
   IRuntime() = default;
@@ -30,6 +38,11 @@ public:
   virtual void execute() = 0;
 
   virtual void set_prefill(bool state) = 0;
+
+  virtual void bind_request_meta(std::vector<RequestMeta> &request_metas) = 0;
+
+  virtual void
+  destroy_request_meta(std::vector<RequestMeta> &request_metas) = 0;
 
   virtual ~IRuntime() = default;
 };

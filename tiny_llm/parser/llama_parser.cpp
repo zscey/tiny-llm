@@ -161,7 +161,7 @@ auto llama_add_node(Graph &g, const std::string &node_name,
 }
 } // namespace
 
-auto llama_parser(const nlohmann::json &config) -> Graph {
+auto llama_parser(const nlohmann::json &config, bool paged) -> Graph {
   TINY_LLM_CHECK(InvalidArgumentError,
                  config["attention_bias"].get<bool>() == false);
   TINY_LLM_CHECK(InvalidArgumentError, config["rope_scaling"].is_null());
@@ -208,7 +208,8 @@ auto llama_parser(const nlohmann::json &config) -> Graph {
             .q_head = q_head,
             .kv_head = kv_head,
             .bias = false,
-            .max_len = config["max_position_embeddings"].get<uint32_t>()},
+            .max_len = config["max_position_embeddings"].get<uint32_t>(),
+            .paged = paged},
         {input_norm_out, rope_cos, rope_sin, input_pos_ids_name});
     auto [attn_residual] = llama_add_node(
         g, fmt::format("model.layers.{}.attn_residual", layer_id),
@@ -265,7 +266,8 @@ auto llama_parser(const nlohmann::json &config) -> Graph {
       SliceLinearParam{.in_dim = hidden_size,
                        .out_dim = config["vocab_size"].get<uint32_t>(),
                        .bias = false,
-                       .only_last_q = 1},
+                       .only_last_q = 1,
+                       .paged = paged},
       {model_norm});
 
   g.set_input_names({input_token_name, input_pos_ids_name});

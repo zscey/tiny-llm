@@ -528,7 +528,7 @@ TEST(Runtime, AttentionPaged) {
       cuda_runtime.cpu_tensor_copy_to_input("cos", cos);
       cuda_runtime.cpu_tensor_copy_to_input("sin", sin);
 
-      std::vector<cuda::RequestMeta> request_metas(2);
+      std::vector<RequestMeta> request_metas(2);
       request_metas.at(0).seq_len = 3;
       request_metas.at(1).seq_len = 2;
       {
