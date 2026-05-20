@@ -385,6 +385,17 @@ TEST(Runtime, SliceLinearPaged) {
         EXPECT_FLOAT_EQ(out_ptr[4], 86.F);
         EXPECT_FLOAT_EQ(out_ptr[5], 338.F);
       }
+
+      cuda_runtime.destroy_request_meta(request_metas);
+      EXPECT_TRUE(request_metas[0].seq_len == 0);
+      EXPECT_TRUE(request_metas[0].kv_len == 0);
+      EXPECT_TRUE(request_metas[0].kv_pages.empty());
+      EXPECT_TRUE(request_metas[1].seq_len == 0);
+      EXPECT_TRUE(request_metas[1].kv_len == 0);
+      EXPECT_TRUE(request_metas[1].kv_pages.empty());
+      EXPECT_TRUE(request_metas[2].seq_len == 0);
+      EXPECT_TRUE(request_metas[2].kv_len == 0);
+      EXPECT_TRUE(request_metas[2].kv_pages.empty());
     }
   }
 }
