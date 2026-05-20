@@ -167,10 +167,13 @@ auto Pipeline::apply(const std::vector<std::string> &prompts,
     auto vocab_size = output_->shape().back();
     std::vector<int64_t> target_shape{prompt_size, vocab_size};
     Tensor token_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
-                     {prompt_size, 1});
+                     {1, prompt_size});
     Tensor pos_ids({.type = DeviceType::kCpu, .id = 0}, DataType::kUint32,
-                   {prompt_size, 1});
+                   {1, prompt_size});
 
+    indexes_->reallocate({prompt_size, vocab_size});
+    valid_size_->reallocate({prompt_size});
+    unfinished_->reallocate({prompt_size});
     auto *unfinished_ptr = unfinished_->data<uint32_t>();
     for (int64_t i = 0; i < prompt_size; ++i) {
       unfinished_ptr[i] = 1;
