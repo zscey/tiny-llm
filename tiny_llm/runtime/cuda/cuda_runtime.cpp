@@ -13,6 +13,7 @@
 namespace tiny_llm::cuda {
 namespace {
 constexpr size_t kAlign = 256;
+constexpr uint32_t kPageSize = 32;
 
 template <typename From, typename To>
 auto vector_convert(const std::vector<From> &from) -> std::vector<To> {
@@ -234,6 +235,32 @@ struct SizeCalculator {
     dynamic_gmp.deallocate(inner_relation.at(3).v_block);
   }
 
+  void operator()(const CausalAttentionPagedKernel &kernel) {
+    const auto &cur_task = plan->tasks.at(cur_task_id);
+    assign_initializer(cur_task.input_descs.at(4));
+    assign_initializer(cur_task.input_descs.at(5));
+    assign_initializer(cur_task.input_descs.at(6));
+    assign_initializer(cur_task.input_descs.at(7));
+    if (kernel.param.bias) {
+      assign_initializer(cur_task.input_descs.at(8));
+      assign_initializer(cur_task.input_descs.at(9));
+      assign_initializer(cur_task.input_descs.at(10));
+      assign_initializer(cur_task.input_descs.at(11));
+    }
+    set_v_block(nullptr, cur_task.output_descs.at(0));
+
+    auto &inner_relation = inner_relations[&kernel];
+    const auto &hidden_state_desc = cur_task.input_descs.at(0);
+    auto q_o_size = element_num(hidden_state_desc->max_shape) *
+                    type_size(hidden_state_desc->dtype);
+    inner_relation.emplace_back(0, dynamic_gmp.allocate(q_o_size, kAlign),
+                                false);
+    inner_relation.emplace_back(0, dynamic_gmp.allocate(q_o_size, kAlign),
+                                false);
+    dynamic_gmp.deallocate(inner_relation.at(0).v_block);
+    dynamic_gmp.deallocate(inner_relation.at(1).v_block);
+  }
+
   void operator()(const SliceLinearKernel &kernel) {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     assign_initializer(cur_task.input_descs.at(1));
@@ -283,6 +310,16 @@ struct SizeCalculator {
         TINY_LLM_CHECK(RuntimeError, inner_relation.at(3).exclusive == false);
         cur_kernel.o_cache = reinterpret_cast<float *>(
             ptrs.dynamic_ptr + inner_relation.at(3).v_block.offset);
+      } else if (std::holds_alternative<CausalAttentionPagedKernel>(
+                     task.kernel)) {
+        auto &cur_kernel = std::get<CausalAttentionPagedKernel>(task.kernel);
+        const auto &inner_relation = inner_relations.at(&cur_kernel);
+        TINY_LLM_CHECK(RuntimeError, inner_relation.at(0).exclusive == false);
+        cur_kernel.q_cache = reinterpret_cast<float *>(
+            ptrs.dynamic_ptr + inner_relation.at(0).v_block.offset);
+        TINY_LLM_CHECK(RuntimeError, inner_relation.at(1).exclusive == false);
+        cur_kernel.o_cache = reinterpret_cast<float *>(
+            ptrs.dynamic_ptr + inner_relation.at(1).v_block.offset);
       }
     }
   }
@@ -370,6 +407,33 @@ struct WeightAssigner {
     }
   }
 
+  // TODO(hao.lin): Currently, the use of `auto` in `operator()` is prohibited,
+  // but perhaps this constraint could be relaxed to simplify repetitive code.
+  void operator()(const CausalAttentionPagedKernel &kernel) const {
+    auto q_dim = kernel.param.head_dim * kernel.param.q_head;
+    auto kv_dim = kernel.param.head_dim * kernel.param.kv_head;
+
+    const auto &cur_task = plan->tasks.at(cur_task_id);
+    check_and_copy_weight(cur_task.input_descs.at(4), cur_task.inputs.at(4),
+                          {q_dim, q_dim});
+    check_and_copy_weight(cur_task.input_descs.at(5), cur_task.inputs.at(5),
+                          {kv_dim, q_dim});
+    check_and_copy_weight(cur_task.input_descs.at(6), cur_task.inputs.at(6),
+                          {kv_dim, q_dim});
+    check_and_copy_weight(cur_task.input_descs.at(7), cur_task.inputs.at(7),
+                          {q_dim, q_dim});
+    if (kernel.param.bias) {
+      check_and_copy_weight(cur_task.input_descs.at(8), cur_task.inputs.at(8),
+                            {q_dim});
+      check_and_copy_weight(cur_task.input_descs.at(9), cur_task.inputs.at(9),
+                            {kv_dim});
+      check_and_copy_weight(cur_task.input_descs.at(10), cur_task.inputs.at(10),
+                            {kv_dim});
+      check_and_copy_weight(cur_task.input_descs.at(11), cur_task.inputs.at(11),
+                            {q_dim});
+    }
+  }
+
   void operator()(const SliceLinearKernel &kernel) const {
     const auto &cur_task = plan->tasks.at(cur_task_id);
     check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
@@ -383,8 +447,10 @@ struct WeightAssigner {
 } // namespace
 
 CudaRuntime::CudaRuntime(CudaPlan plan,
-                         const WeightManagerWrapper &weight_manager_wrapper)
-    : plan_(std::move(plan)), ctx_{CudaContextAllocator::CreateCudaContext()} {
+                         const WeightManagerWrapper &weight_manager_wrapper,
+                         const RuntimeConfig &config)
+    : plan_(std::move(plan)), ctx_{CudaContextAllocator::CreateCudaContext()},
+      config_(config) {
   ThreadCudaContextsGuard guard(ctx_);
 
   SizeCalculator size_calculator{plan_};
@@ -410,6 +476,48 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
   WeightAssigner weight_assigner(plan_, weight_manager_wrapper);
   weight_assigner.assign_weights();
 
+  // special layer infos
+  for (uint32_t i = 0, i_end = static_cast<uint32_t>(plan_.tasks.size());
+       i < i_end; ++i) {
+    const auto &cur_task = plan_.tasks.at(i);
+
+    if (std::holds_alternative<CausalAttentionKernel>(cur_task.kernel)) {
+      attn_info_[cur_task.name] = std::make_tuple(i);
+    } else if (std::holds_alternative<CausalAttentionPagedKernel>(
+                   cur_task.kernel)) {
+      const auto &kernel =
+          std::get<CausalAttentionPagedKernel>(cur_task.kernel);
+
+      uint32_t page_num = (kernel.param.max_len + kPageSize - 1) / kPageSize;
+      page_attn_info_.emplace(
+          cur_task.name,
+          std::make_tuple(i,
+                          PagePool{PagePoolConfig{
+                              .num_pages = config_.max_request_num * page_num,
+                              .num_heads = kernel.param.kv_head,
+                              .page_size = kPageSize,
+                              .head_dim = kernel.param.head_dim,
+                              .device_type = DeviceType::kCuda,
+                              .data_type = DataType::kFloat32}}));
+      runtime_meta_.block_tables.emplace(
+          cur_task.name,
+          std::make_tuple(0, Tensor{{.type = DeviceType::kCuda, .id = ctx_.id},
+                                    DataType::kUint32,
+                                    {config_.max_request_num, page_num},
+                                    true}));
+    }
+  }
+
+  // other runtime meta
+  runtime_meta_.seq_separator =
+      Tensor({.type = DeviceType::kCuda, .id = ctx_.id}, DataType::kUint32,
+             {config_.max_request_num + 1}, true);
+  runtime_meta_.cache_offsets =
+      Tensor({.type = DeviceType::kCuda, .id = ctx_.id}, DataType::kUint32,
+             {config_.max_request_num}, true);
+  runtime_meta_.kv_lens =
+      Tensor({.type = DeviceType::kCuda, .id = ctx_.id}, DataType::kUint32,
+             {config_.max_request_num}, true);
   ThreadCudaContexts::Synchronize();
 }
 
@@ -526,10 +634,154 @@ void CudaRuntime::execute() {
 }
 
 void CudaRuntime::set_prefill(bool state) {
-  for (auto &task : plan_.tasks) {
-    if (std::holds_alternative<CausalAttentionKernel>(task.kernel)) {
-      std::get<CausalAttentionKernel>(task.kernel).is_prefill = state;
+  is_prefill_ = state;
+  // it's just historical compatibility.
+  for (const auto &[name, info] : attn_info_) {
+    std::get<CausalAttentionKernel>(plan_.tasks.at(std::get<0>(info)).kernel)
+        .is_prefill = state;
+  }
+}
+
+void CudaRuntime::bind_request_meta(std::vector<RequestMeta> &request_metas) {
+  ThreadCudaContextsGuard guard(ctx_);
+
+  TINY_LLM_CHECK(RuntimeError, request_metas.size() <= config_.max_request_num);
+  if (is_prefill_) {
+    for (auto &meta : request_metas) {
+      TINY_LLM_CHECK(RuntimeError, meta.kv_len == 0);
+      TINY_LLM_CHECK(RuntimeError, meta.kv_pages.empty());
+      meta.kv_len = meta.seq_len;
+
+      for (auto &[name, info] : page_attn_info_) {
+        auto &[task_id, page_pool] = info;
+        auto &cur_kernel = std::get<CausalAttentionPagedKernel>(
+            plan_.tasks.at(task_id).kernel);
+        TINY_LLM_CHECK(RuntimeError, meta.kv_len <= cur_kernel.param.max_len);
+
+        meta.kv_pages.emplace(name,
+                              page_pool.allocate_pages(
+                                  (meta.kv_len + kPageSize - 1) / kPageSize));
+      }
     }
+  } else {
+    for (auto &meta : request_metas) {
+      TINY_LLM_CHECK(RuntimeError, meta.seq_len == 1);
+      TINY_LLM_CHECK(RuntimeError,
+                     meta.kv_pages.size() == page_attn_info_.size());
+      ++meta.kv_len;
+
+      for (auto &[name, pages] : meta.kv_pages) {
+        auto iter = page_attn_info_.find(name);
+        TINY_LLM_CHECK(RuntimeError, iter != page_attn_info_.end());
+
+        auto &[task_id, page_pool] = iter->second;
+        auto &cur_kernel = std::get<CausalAttentionPagedKernel>(
+            plan_.tasks.at(task_id).kernel);
+        TINY_LLM_CHECK(RuntimeError, meta.kv_len <= cur_kernel.param.max_len);
+
+        if (meta.kv_len > pages.size() * kPageSize) {
+          pages.emplace_back(page_pool.allocate_pages(1).at(0));
+        }
+      }
+    }
+  }
+
+  if (!page_attn_info_.empty()) {
+    auto reallocate_and_copy = [](const Tensor &src, Tensor &dst) -> void {
+      dst.reallocate(src.shape());
+      src.copy_to(dst);
+    };
+
+    runtime_meta_.total_queries = 0;
+    runtime_meta_.num_requests = request_metas.size();
+    runtime_meta_.max_q_len = 0;
+    for (auto &[name, block_table] : runtime_meta_.block_tables) {
+      std::get<0>(block_table) = 0;
+    }
+
+    {
+      Tensor seq_separator({.type = DeviceType::kCpu}, DataType::kUint32,
+                           {runtime_meta_.num_requests + 1}, true);
+      Tensor cache_offsets({.type = DeviceType::kCpu}, DataType::kUint32,
+                           {runtime_meta_.num_requests}, true);
+      Tensor kv_lens({.type = DeviceType::kCpu}, DataType::kUint32,
+                     {runtime_meta_.num_requests}, true);
+
+      auto *seq_separator_ptr = seq_separator.data<uint32_t>();
+      *seq_separator_ptr++ = 0;
+      auto *cache_offsets_ptr = cache_offsets.data<uint32_t>();
+      auto *kv_lens_ptr = kv_lens.data<uint32_t>();
+
+      for (const auto &meta : request_metas) {
+        runtime_meta_.total_queries += meta.seq_len;
+        runtime_meta_.max_q_len =
+            std::max(runtime_meta_.max_q_len, meta.seq_len);
+        for (const auto &[name, page] : meta.kv_pages) {
+          auto &cur_block_table = runtime_meta_.block_tables.at(name);
+          std::get<0>(cur_block_table) = std::max(
+              std::get<0>(cur_block_table), static_cast<uint32_t>(page.size()));
+        }
+
+        *seq_separator_ptr++ = runtime_meta_.total_queries;
+        *cache_offsets_ptr++ = is_prefill_ ? 0 : meta.kv_len - 1;
+        *kv_lens_ptr++ = meta.kv_len;
+      }
+
+      reallocate_and_copy(seq_separator, runtime_meta_.seq_separator);
+      reallocate_and_copy(cache_offsets, runtime_meta_.cache_offsets);
+      reallocate_and_copy(kv_lens, runtime_meta_.kv_lens);
+    }
+
+    {
+      Tensor cpu_block_table({.type = DeviceType::kCpu}, DataType::kUint32);
+      for (auto &[name, info] : page_attn_info_) {
+        auto &[max_blocks, block_table] = runtime_meta_.block_tables.at(name);
+        cpu_block_table.reallocate({runtime_meta_.num_requests, max_blocks});
+        {
+          auto *cpu_block_table_ptr = cpu_block_table.data<uint32_t>();
+          for (const auto &meta : request_metas) {
+            const auto &cur_page = meta.kv_pages.at(name);
+            std::memcpy(cpu_block_table_ptr, cur_page.data(),
+                        cur_page.size() * sizeof(uint32_t));
+            cpu_block_table_ptr += max_blocks;
+          }
+          reallocate_and_copy(cpu_block_table, block_table);
+        }
+
+        auto &cur_kernel = std::get<CausalAttentionPagedKernel>(
+            plan_.tasks.at(std::get<0>(info)).kernel);
+        cur_kernel.set_meta(
+            {.is_prefill = is_prefill_,
+             .page_size = kPageSize,
+             .k_pool = static_cast<float *>(std::get<1>(info).k_pool_ptr()),
+             .v_pool = static_cast<float *>(std::get<1>(info).v_pool_ptr()),
+             .block_table = block_table.data<uint32_t>(),
+             .seq_separator = runtime_meta_.seq_separator.data<uint32_t>(),
+             .cache_offsets = runtime_meta_.cache_offsets.data<uint32_t>(),
+             .kv_lens = runtime_meta_.kv_lens.data<uint32_t>(),
+             .total_queries = runtime_meta_.total_queries,
+             .num_requests = runtime_meta_.num_requests,
+             .max_blocks = max_blocks,
+             .max_q_len = runtime_meta_.max_q_len});
+      }
+    }
+  }
+}
+
+void CudaRuntime::destroy_request_meta(
+    std::vector<RequestMeta> &request_metas) {
+  for (auto &meta : request_metas) {
+    for (auto &[name, tables] : meta.kv_pages) {
+      auto iter = page_attn_info_.find(name);
+      TINY_LLM_CHECK(RuntimeError, iter != page_attn_info_.end());
+
+      std::get<1>(iter->second).free_pages(tables);
+      tables.clear();
+    }
+
+    meta.seq_len = 0;
+    meta.kv_len = 0;
+    meta.kv_pages.clear();
   }
 }
 } // namespace tiny_llm::cuda

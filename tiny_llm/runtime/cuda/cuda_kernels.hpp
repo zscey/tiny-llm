@@ -103,7 +103,6 @@ public:
 
   uint32_t batch{};
   uint32_t seq_len{};
-  uint32_t hidden_size{};
 
   bool is_prefill{true};
   mutable uint32_t cache_length{};
@@ -117,6 +116,43 @@ public:
   void dtype_shape_infer(const TensorDesc *const *input_descs,
                          TensorDesc *const *output_descs);
   void execute(const void *const *inputs, void *const *outputs);
+};
+
+/// @brief The scheduling is outside of `CausalAttentionPagedKernel`, therefore
+/// a class `OpMeta` is abstracted.
+class CausalAttentionPagedKernel {
+public:
+  CausalAttentionParam param;
+
+  struct OpMeta {
+    bool is_prefill{};
+
+    uint32_t page_size{};
+    float *k_pool{};
+    float *v_pool{};
+
+    const uint32_t *block_table{};
+    const uint32_t *seq_separator{};
+    const uint32_t *cache_offsets{};
+    const uint32_t *kv_lens{};
+    uint32_t total_queries{};
+    uint32_t num_requests{};
+    uint32_t max_blocks{};
+    uint32_t max_q_len{};
+  };
+
+  float *q_cache{};
+  float *o_cache{};
+
+  OpMeta meta;
+
+  void set_meta(const OpMeta &m) { meta = m; }
+
+  /// @brief {hidden_state, cos, sin, pos_ids, q_weight, k_weight, v_weight,
+  /// o_weight, [q_bias, k_bias, v_bias, o_bias]} -{output}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs) const;
+  void execute(const void *const *inputs, void *const *outputs) const;
 };
 
 class SliceLinearKernel {
@@ -134,5 +170,5 @@ public:
 using CudaKernel =
     std::variant<SiLUKernel, EmbeddingKernel, RopeKernel, RMSNormKernel,
                  AddKernel, MulKernel, LinearKernel, CausalAttentionKernel,
-                 SliceLinearKernel>;
+                 CausalAttentionPagedKernel, SliceLinearKernel>;
 } // namespace tiny_llm::cuda

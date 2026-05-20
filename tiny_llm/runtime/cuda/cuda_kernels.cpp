@@ -237,7 +237,6 @@ void CausalAttentionKernel::dtype_shape_infer(
   if (!is_prefill) {
     TINY_LLM_CHECK(RuntimeError, seq_len == 1);
   }
-  hidden_size = h_desc->cur_shape.at(2);
 }
 
 void CausalAttentionKernel::execute(const void *const *inputs,
@@ -264,28 +263,125 @@ void CausalAttentionKernel::execute(const void *const *inputs,
       param.bias ? static_cast<const float *>(inputs[11]) : nullptr;
 
   cuda::gemm_row_major_lt(hidden_state, q_weight, q_bias, q_cache, batch,
-                          seq_len, hidden_size, param.q_head, param.head_dim, 0,
-                          seq_len);
+                          seq_len, param.q_head * param.head_dim, param.q_head,
+                          param.head_dim, 0, seq_len);
   cuda::apply_rope_inplace(cos, sin, pos_ids, q_cache, batch, param.q_head,
                            seq_len, param.head_dim, 0, seq_len);
   cuda::gemm_row_major_lt(hidden_state, k_weight, k_bias, k_cache, batch,
-                          seq_len, hidden_size, param.kv_head, param.head_dim,
-                          cache_length, param.max_len);
+                          seq_len, param.q_head * param.head_dim, param.kv_head,
+                          param.head_dim, cache_length, param.max_len);
   cuda::apply_rope_inplace(cos, sin, pos_ids, k_cache, batch, param.kv_head,
                            seq_len, param.head_dim, cache_length,
                            param.max_len);
   cuda::gemm_row_major_lt(hidden_state, v_weight, v_bias, v_cache, batch,
-                          seq_len, hidden_size, param.kv_head, param.head_dim,
-                          cache_length, param.max_len);
+                          seq_len, param.q_head * param.head_dim, param.kv_head,
+                          param.head_dim, cache_length, param.max_len);
   auto attn_type =
       is_prefill ? AttentionType::kCausalMask : AttentionType::kNoMask;
   cuda::flash_attn(q_cache, k_cache, v_cache, o_cache, batch, param.q_head,
                    param.kv_head, seq_len, new_cache_length, param.head_dim,
                    param.max_len, attn_type);
-  cuda::gemm_row_major_tl(o_cache, o_weight, o_bias,
-                          static_cast<float *>(outputs[0]), batch, param.q_head,
-                          seq_len, param.head_dim, hidden_size);
+  cuda::gemm_row_major_tl(
+      o_cache, o_weight, o_bias, static_cast<float *>(outputs[0]), batch,
+      param.q_head, seq_len, param.head_dim, param.q_head * param.head_dim);
   cache_length = new_cache_length;
+}
+
+void CausalAttentionPagedKernel::dtype_shape_infer(
+    const TensorDesc *const *input_descs,
+    TensorDesc *const *output_descs) const {
+  auto q_dim = static_cast<size_t>(param.q_head) * param.head_dim;
+  auto kv_dim = static_cast<size_t>(param.kv_head) * param.head_dim;
+
+  const auto *h_desc = input_descs[0];
+  TINY_LLM_CHECK(RuntimeError, h_desc->cur_shape.size() == 3);
+  TINY_LLM_CHECK(RuntimeError, h_desc->cur_shape.at(0) == 1);
+  check_desc_dtype_and_shape(*h_desc, DataType::kFloat32, q_dim);
+  const auto *cos_desc = input_descs[1];
+  TINY_LLM_CHECK(RuntimeError, cos_desc->cur_shape.size() == 2);
+  check_desc_dtype_and_shape(*cos_desc, DataType::kFloat32, param.head_dim / 2);
+  const auto *sin_desc = input_descs[2];
+  check_desc_dtype_and_shape(*sin_desc, DataType::kFloat32,
+                             cos_desc->cur_shape);
+  const auto *pos_desc = input_descs[3];
+  check_desc_dtype_and_shape(
+      *pos_desc, DataType::kUint32,
+      {h_desc->cur_shape.begin(), std::prev(h_desc->cur_shape.end())});
+  // q, k, v, o weight
+  check_desc_dtype_and_shape(*input_descs[4], DataType::kFloat32,
+                             {q_dim, q_dim});
+  check_desc_dtype_and_shape(*input_descs[5], DataType::kFloat32,
+                             {kv_dim, q_dim});
+  check_desc_dtype_and_shape(*input_descs[6], DataType::kFloat32,
+                             {kv_dim, q_dim});
+  check_desc_dtype_and_shape(*input_descs[7], DataType::kFloat32,
+                             {q_dim, q_dim});
+  if (param.bias) {
+    // q, k, v, o bias
+    check_desc_dtype_and_shape(*input_descs[8], DataType::kFloat32,
+                               std::vector<size_t>{q_dim});
+    check_desc_dtype_and_shape(*input_descs[9], DataType::kFloat32,
+                               std::vector<size_t>{kv_dim});
+    check_desc_dtype_and_shape(*input_descs[10], DataType::kFloat32,
+                               std::vector<size_t>{kv_dim});
+    check_desc_dtype_and_shape(*input_descs[11], DataType::kFloat32,
+                               std::vector<size_t>{q_dim});
+  }
+
+  auto *output_desc = output_descs[0];
+  output_desc->dtype = h_desc->dtype;
+  output_desc->cur_shape = h_desc->cur_shape;
+}
+
+void CausalAttentionPagedKernel::execute(const void *const *inputs,
+                                         void *const *outputs) const {
+  const auto *hidden_state = static_cast<const float *>(inputs[0]);
+  const auto *cos = static_cast<const float *>(inputs[1]);
+  const auto *sin = static_cast<const float *>(inputs[2]);
+  const auto *pos_ids = static_cast<const uint32_t *>(inputs[3]);
+  const auto *q_weight = static_cast<const float *>(inputs[4]);
+  const auto *k_weight = static_cast<const float *>(inputs[5]);
+  const auto *v_weight = static_cast<const float *>(inputs[6]);
+  const auto *o_weight = static_cast<const float *>(inputs[7]);
+  const auto *q_bias =
+      param.bias ? static_cast<const float *>(inputs[8]) : nullptr;
+  const auto *k_bias =
+      param.bias ? static_cast<const float *>(inputs[9]) : nullptr;
+  const auto *v_bias =
+      param.bias ? static_cast<const float *>(inputs[10]) : nullptr;
+  const auto *o_bias =
+      param.bias ? static_cast<const float *>(inputs[11]) : nullptr;
+
+  cuda::gemm_row_major_lt(hidden_state, q_weight, q_bias, q_cache, 1,
+                          meta.total_queries, param.q_head * param.head_dim,
+                          param.q_head, param.head_dim, 0, meta.total_queries);
+  cuda::apply_rope_inplace(cos, sin, pos_ids, q_cache, 1, param.q_head,
+                           meta.total_queries, param.head_dim, 0,
+                           meta.total_queries);
+  cuda::gemm_row_major_lt_paged(
+      hidden_state, k_weight, k_bias, meta.k_pool, meta.block_table,
+      meta.seq_separator, meta.cache_offsets, meta.total_queries,
+      meta.num_requests, param.q_head * param.head_dim, param.kv_head,
+      param.head_dim, meta.max_blocks, meta.page_size);
+  cuda::apply_rope_inplace_paged(
+      cos, sin, pos_ids, meta.k_pool, meta.block_table, meta.seq_separator,
+      meta.cache_offsets, meta.total_queries, meta.num_requests, param.kv_head,
+      param.head_dim, meta.max_blocks, meta.page_size);
+  cuda::gemm_row_major_lt_paged(
+      hidden_state, v_weight, v_bias, meta.v_pool, meta.block_table,
+      meta.seq_separator, meta.cache_offsets, meta.total_queries,
+      meta.num_requests, param.q_head * param.head_dim, param.kv_head,
+      param.head_dim, meta.max_blocks, meta.page_size);
+  cuda::flash_attn_paged(
+      q_cache, meta.k_pool, meta.v_pool, o_cache, meta.seq_separator,
+      meta.block_table, meta.kv_lens, meta.num_requests, param.q_head,
+      param.kv_head, param.head_dim, meta.max_blocks, meta.page_size,
+      meta.max_q_len,
+      meta.is_prefill ? AttentionType::kCausalMask : AttentionType::kNoMask);
+  cuda::gemm_row_major_tl(o_cache, o_weight, o_bias,
+                          static_cast<float *>(outputs[0]), 1, param.q_head,
+                          meta.total_queries, param.head_dim,
+                          param.q_head * param.head_dim);
 }
 
 void SliceLinearKernel::dtype_shape_infer(const TensorDesc *const *input_descs,
