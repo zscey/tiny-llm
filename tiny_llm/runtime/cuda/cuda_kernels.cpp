@@ -295,6 +295,7 @@ void CausalAttentionPagedKernel::dtype_shape_infer(
 
   const auto *h_desc = input_descs[0];
   TINY_LLM_CHECK(RuntimeError, h_desc->cur_shape.size() == 3);
+  TINY_LLM_CHECK(RuntimeError, h_desc->cur_shape.at(0) == 1);
   check_desc_dtype_and_shape(*h_desc, DataType::kFloat32, q_dim);
   const auto *cos_desc = input_descs[1];
   TINY_LLM_CHECK(RuntimeError, cos_desc->cur_shape.size() == 2);
