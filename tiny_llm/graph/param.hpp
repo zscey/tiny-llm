@@ -71,6 +71,8 @@ public:
   uint32_t out_dim{};
   bool bias{false};
   uint32_t only_last_q{};
+
+  bool paged{false};
 };
 
 using Param =

@@ -416,4 +416,38 @@ void SliceLinearKernel::execute(const void *const *inputs,
                     param.in_dim, param.out_dim, q_end - param.only_last_q,
                     q_end);
 }
+
+void SliceLinearPagedKernel::dtype_shape_infer(
+    const TensorDesc *const *input_descs,
+    TensorDesc *const *output_descs) const {
+  TINY_LLM_CHECK(RuntimeError, param.only_last_q == 1);
+  const auto *input_desc = input_descs[0];
+  TINY_LLM_CHECK(RuntimeError, input_desc->cur_shape.size() == 3);
+  TINY_LLM_CHECK(RuntimeError, input_desc->cur_shape[0] == 1);
+  check_desc_dtype_and_shape(*input_desc, DataType::kFloat32, param.in_dim);
+  const auto *weight_desc = input_descs[1];
+  check_desc_dtype_and_shape(*weight_desc, DataType::kFloat32,
+                             {param.out_dim, param.in_dim});
+  if (param.bias) {
+    const auto *bias_desc = input_descs[2];
+    check_desc_dtype_and_shape(*bias_desc, DataType::kFloat32,
+                               std::vector<size_t>{param.out_dim});
+  }
+
+  auto *output_desc = output_descs[0];
+  output_desc->dtype = input_desc->dtype;
+  output_desc->cur_shape = {
+      1, meta.num_requests > 0 ? meta.num_requests : input_desc->cur_shape[1],
+      param.out_dim};
+}
+
+void SliceLinearPagedKernel::execute(const void *const *inputs,
+                                     void *const *outputs) const {
+  const auto *bias_ptr =
+      param.bias ? static_cast<const float *>(inputs[2]) : nullptr;
+  gemm_row_major_s1l_paged(static_cast<const float *>(inputs[0]),
+                           static_cast<const float *>(inputs[1]), bias_ptr,
+                           static_cast<float *>(outputs[0]), meta.seq_separator,
+                           meta.num_requests, param.in_dim, param.out_dim);
+}
 } // namespace tiny_llm::cuda
