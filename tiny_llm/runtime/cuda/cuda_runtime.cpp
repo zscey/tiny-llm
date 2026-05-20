@@ -270,6 +270,15 @@ struct SizeCalculator {
     set_v_block(nullptr, cur_task.output_descs.at(0));
   }
 
+  void operator()(const SliceLinearPagedKernel &kernel) {
+    const auto &cur_task = plan->tasks.at(cur_task_id);
+    assign_initializer(cur_task.input_descs.at(1));
+    if (kernel.param.bias) {
+      assign_initializer(cur_task.input_descs.at(2));
+    }
+    set_v_block(nullptr, cur_task.output_descs.at(0));
+  }
+
   struct BufferPtrs {
     std::byte *dynamic_ptr;
     std::byte *static_ptr;
@@ -443,6 +452,16 @@ struct WeightAssigner {
                             {kernel.param.out_dim});
     }
   }
+
+  void operator()(const SliceLinearPagedKernel &kernel) const {
+    const auto &cur_task = plan->tasks.at(cur_task_id);
+    check_and_copy_weight(cur_task.input_descs.at(1), cur_task.inputs.at(1),
+                          {kernel.param.out_dim, kernel.param.in_dim});
+    if (kernel.param.bias) {
+      check_and_copy_weight(cur_task.input_descs.at(2), cur_task.inputs.at(2),
+                            {kernel.param.out_dim});
+    }
+  }
 };
 } // namespace
 
@@ -505,6 +524,9 @@ CudaRuntime::CudaRuntime(CudaPlan plan,
                                     DataType::kUint32,
                                     {config_.max_request_num, page_num},
                                     true}));
+    } else if (std::holds_alternative<SliceLinearPagedKernel>(
+                   cur_task.kernel)) {
+      page_slice_linear_info_[cur_task.name] = std::make_tuple(i);
     }
   }
 
@@ -686,12 +708,12 @@ void CudaRuntime::bind_request_meta(std::vector<RequestMeta> &request_metas) {
     }
   }
 
-  if (!page_attn_info_.empty()) {
-    auto reallocate_and_copy = [](const Tensor &src, Tensor &dst) -> void {
-      dst.reallocate(src.shape());
-      src.copy_to(dst);
-    };
+  auto reallocate_and_copy = [](const Tensor &src, Tensor &dst) -> void {
+    dst.reallocate(src.shape());
+    src.copy_to(dst);
+  };
 
+  if (!page_attn_info_.empty() || !page_slice_linear_info_.empty()) {
     runtime_meta_.total_queries = 0;
     runtime_meta_.num_requests = request_metas.size();
     runtime_meta_.max_q_len = 0;
@@ -731,39 +753,49 @@ void CudaRuntime::bind_request_meta(std::vector<RequestMeta> &request_metas) {
       reallocate_and_copy(cache_offsets, runtime_meta_.cache_offsets);
       reallocate_and_copy(kv_lens, runtime_meta_.kv_lens);
     }
+  }
 
-    {
-      Tensor cpu_block_table({.type = DeviceType::kCpu}, DataType::kUint32);
-      for (auto &[name, info] : page_attn_info_) {
-        auto &[max_blocks, block_table] = runtime_meta_.block_tables.at(name);
-        cpu_block_table.reallocate({runtime_meta_.num_requests, max_blocks});
-        {
-          auto *cpu_block_table_ptr = cpu_block_table.data<uint32_t>();
-          for (const auto &meta : request_metas) {
-            const auto &cur_page = meta.kv_pages.at(name);
-            std::memcpy(cpu_block_table_ptr, cur_page.data(),
-                        cur_page.size() * sizeof(uint32_t));
-            cpu_block_table_ptr += max_blocks;
-          }
-          reallocate_and_copy(cpu_block_table, block_table);
+  if (!page_attn_info_.empty()) {
+    Tensor cpu_block_table({.type = DeviceType::kCpu}, DataType::kUint32);
+    for (auto &[name, info] : page_attn_info_) {
+      auto &[max_blocks, block_table] = runtime_meta_.block_tables.at(name);
+      cpu_block_table.reallocate({runtime_meta_.num_requests, max_blocks});
+      {
+        auto *cpu_block_table_ptr = cpu_block_table.data<uint32_t>();
+        for (const auto &meta : request_metas) {
+          const auto &cur_page = meta.kv_pages.at(name);
+          std::memcpy(cpu_block_table_ptr, cur_page.data(),
+                      cur_page.size() * sizeof(uint32_t));
+          cpu_block_table_ptr += max_blocks;
         }
-
-        auto &cur_kernel = std::get<CausalAttentionPagedKernel>(
-            plan_.tasks.at(std::get<0>(info)).kernel);
-        cur_kernel.set_meta(
-            {.is_prefill = is_prefill_,
-             .page_size = kPageSize,
-             .k_pool = static_cast<float *>(std::get<1>(info).k_pool_ptr()),
-             .v_pool = static_cast<float *>(std::get<1>(info).v_pool_ptr()),
-             .block_table = block_table.data<uint32_t>(),
-             .seq_separator = runtime_meta_.seq_separator.data<uint32_t>(),
-             .cache_offsets = runtime_meta_.cache_offsets.data<uint32_t>(),
-             .kv_lens = runtime_meta_.kv_lens.data<uint32_t>(),
-             .total_queries = runtime_meta_.total_queries,
-             .num_requests = runtime_meta_.num_requests,
-             .max_blocks = max_blocks,
-             .max_q_len = runtime_meta_.max_q_len});
+        reallocate_and_copy(cpu_block_table, block_table);
       }
+
+      auto &cur_kernel = std::get<CausalAttentionPagedKernel>(
+          plan_.tasks.at(std::get<0>(info)).kernel);
+      cur_kernel.set_meta(
+          {.is_prefill = is_prefill_,
+           .page_size = kPageSize,
+           .k_pool = static_cast<float *>(std::get<1>(info).k_pool_ptr()),
+           .v_pool = static_cast<float *>(std::get<1>(info).v_pool_ptr()),
+           .block_table = block_table.data<uint32_t>(),
+           .seq_separator = runtime_meta_.seq_separator.data<uint32_t>(),
+           .cache_offsets = runtime_meta_.cache_offsets.data<uint32_t>(),
+           .kv_lens = runtime_meta_.kv_lens.data<uint32_t>(),
+           .total_queries = runtime_meta_.total_queries,
+           .num_requests = runtime_meta_.num_requests,
+           .max_blocks = max_blocks,
+           .max_q_len = runtime_meta_.max_q_len});
+    }
+  }
+
+  if (!page_slice_linear_info_.empty()) {
+    for (auto &[name, info] : page_slice_linear_info_) {
+      auto &cur_kernel = std::get<SliceLinearPagedKernel>(
+          plan_.tasks.at(std::get<0>(info)).kernel);
+      cur_kernel.set_meta(
+          {.seq_separator = runtime_meta_.seq_separator.data<uint32_t>(),
+           .num_requests = runtime_meta_.num_requests});
     }
   }
 }

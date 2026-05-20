@@ -167,8 +167,29 @@ public:
   void execute(const void *const *inputs, void *const *outputs) const;
 };
 
+// TODO(hao.lin): the current behavior is slice 1, expand to slice n
+class SliceLinearPagedKernel {
+public:
+  SliceLinearParam param;
+
+  struct OpMeta {
+    const uint32_t *seq_separator{};
+    uint32_t num_requests{};
+  };
+
+  OpMeta meta;
+
+  void set_meta(const OpMeta &m) { meta = m; }
+
+  /// @brief {input, weight, [bias]} -{output}
+  void dtype_shape_infer(const TensorDesc *const *input_descs,
+                         TensorDesc *const *output_descs) const;
+  void execute(const void *const *inputs, void *const *outputs) const;
+};
+
 using CudaKernel =
     std::variant<SiLUKernel, EmbeddingKernel, RopeKernel, RMSNormKernel,
                  AddKernel, MulKernel, LinearKernel, CausalAttentionKernel,
-                 CausalAttentionPagedKernel, SliceLinearKernel>;
+                 CausalAttentionPagedKernel, SliceLinearKernel,
+                 SliceLinearPagedKernel>;
 } // namespace tiny_llm::cuda

@@ -38,6 +38,9 @@ constexpr auto kKernelGenerator = Visitor{
       return CausalAttentionKernel{.param = param};
     },
     [](const SliceLinearParam &param) -> CudaKernel {
+      if (param.paged) {
+        return SliceLinearPagedKernel{.param = param};
+      }
       return SliceLinearKernel{.param = param};
     },
 };

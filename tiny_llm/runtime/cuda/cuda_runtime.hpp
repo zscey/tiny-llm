@@ -73,6 +73,7 @@ private:
   std::unordered_map<std::string, std::tuple<uint32_t>> attn_info_;
   std::unordered_map<std::string, std::tuple<uint32_t, PagePool>>
       page_attn_info_;
+  std::unordered_map<std::string, std::tuple<uint32_t>> page_slice_linear_info_;
   // TODO(hao.lin): Expend to the concept of groups.
   RuntimeMeta runtime_meta_;
 };
