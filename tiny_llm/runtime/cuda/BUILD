@@ -35,6 +35,7 @@ cc_library(
         "//tiny_llm/device_managers/cuda:cuda_context",
         "//tiny_llm/runtime:greedy_memory_planer",
         "//tiny_llm/runtime:iruntime",
+        "//tiny_llm/runtime:page_pool",
         "//tiny_llm/weight_managers",
     ],
 )
