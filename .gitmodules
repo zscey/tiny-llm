@@ -1,0 +1,3 @@
+[submodule "tiny-llm-private-test"]
+	path = tiny-llm-private-test
+	url = git@github.com:zscey/tiny-llm-private-test.git
