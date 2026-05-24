@@ -9,10 +9,14 @@ cc_binary(
         "//conditions:default": [],
     }),
     deps = [
-        "//tiny_llm/device_managers/cuda:cuda_context",
         "//tiny_llm/ops/cpu:cpu_ops",
-        "//tiny_llm/ops/cuda:cuda_ops",
         "//tiny_llm/tensor",
         "@google_benchmark//:benchmark",
-    ],
+    ] + select({
+        "//platforms/device:cuda": [
+            "//tiny_llm/device_managers/cuda:cuda_context",
+            "//tiny_llm/ops/cuda:cuda_ops",
+        ],
+        "//conditions:default": [],
+    }),
 )
