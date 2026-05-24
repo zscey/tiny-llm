@@ -196,7 +196,7 @@
     "@@rules_cuda+//cuda:extensions.bzl%toolchain": {
       "general": {
         "bzlTransitiveDigest": "4ZVUUPHAf3T+CGpb0QH7keDu9F9ICcWTZkEO09Wax8k=",
-        "usagesDigest": "7+Jl2kNwzcEi1C9nq2cQJ/pMuTz1CubHBtrD6la1iFU=",
+        "usagesDigest": "oCKYhtQSpY2r3rBOWQailVjPrgiD8UoD0MXVewR1MaM=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
