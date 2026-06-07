@@ -17,37 +17,34 @@ class ThreadPool {
   struct alignas(64) WorkerContext {
     std::deque<std::function<void()>> local_queue;
     std::mutex mtx;
-    std::condition_variable cv;
+    std::condition_variable_any cv;
   };
 
 public:
   explicit ThreadPool(
-      size_t threads = std::max(1U, std::thread::hardware_concurrency() - 1)) {
+      size_t threads = std::max(2U, std::thread::hardware_concurrency()) - 1) {
     workers_.reserve(threads);
     contexts_.reserve(threads);
 
     for (size_t i = 0; i < threads; ++i) {
       auto &ctx = contexts_.emplace_back(std::make_unique<WorkerContext>());
 
-      workers_.emplace_back([&ctx](std::stop_token st) -> void {
+      // NOLINTNEXTLINE(performance-unnecessary-value-param)
+      workers_.emplace_back([ctx_ptr = ctx.get()](std::stop_token st) -> void {
         while (true) {
           std::function<void()> task;
           {
-            std::unique_lock lock(ctx->mtx);
-            ctx->cv.wait(lock, [&]() -> bool {
-              return st.stop_requested() || !ctx->local_queue.empty();
+            std::unique_lock lock(ctx_ptr->mtx);
+            ctx_ptr->cv.wait(lock, st, [&]() -> bool {
+              return !ctx_ptr->local_queue.empty();
             });
 
-            if (st.stop_requested() && ctx->local_queue.empty()) {
+            if (ctx_ptr->local_queue.empty()) {
               break;
             }
 
-            if (ctx->local_queue.empty()) {
-              continue;
-            }
-
-            task = std::move(ctx->local_queue.front());
-            ctx->local_queue.pop_front();
+            task = std::move(ctx_ptr->local_queue.front());
+            ctx_ptr->local_queue.pop_front();
           }
           task();
         }
@@ -61,32 +58,32 @@ public:
     for (auto &w : workers_) {
       w.request_stop();
     }
-
-    for (auto &ctx : contexts_) {
-      ctx->cv.notify_all();
-    }
   }
 
   template <typename F, typename... Args>
     requires std::invocable<F, Args...>
-  auto enqueue(F &&f, Args &&...args)
-      -> std::future<std::invoke_result_t<F, Args...>> {
+  auto enqueue(F &&f, Args &&...args) -> std::future<
+      std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>> {
+    using return_type =
+        std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>;
+
     if (shutting_down_.load(std::memory_order_acquire)) {
       TINY_LLM_THROW_ERROR(RuntimeError, "Enqueue on stopped ThreadPool.");
     }
 
-    auto task = std::make_shared<
-        std::packaged_task<std::invoke_result_t<F, Args...>()>>(
-        std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+    auto task = std::make_shared<std::packaged_task<return_type()>>(
+        [f = std::forward<F>(f),
+         ... args = std::forward<Args>(args)]() mutable -> return_type {
+          return std::invoke(std::move(f), std::move(args)...);
+        });
 
     size_t idx =
         next_worker_.fetch_add(1, std::memory_order_relaxed) % contexts_.size();
     {
-      std::lock_guard lock(contexts_.at(idx)->mtx);
-      contexts_.at(idx)->local_queue.emplace_back(
-          [task]() -> auto { (*task)(); });
+      std::lock_guard lock(contexts_[idx]->mtx);
+      contexts_[idx]->local_queue.emplace_back([task]() -> auto { (*task)(); });
     }
-    contexts_.at(idx)->cv.notify_one();
+    contexts_[idx]->cv.notify_one();
 
     return task->get_future();
   }

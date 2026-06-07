@@ -1,2 +1,4 @@
 Diagnostics:
-  UnusedIncludes: None
+  Suppress:
+    - shared_var_init
+    - unused-includes
