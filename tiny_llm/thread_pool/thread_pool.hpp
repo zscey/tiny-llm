@@ -35,11 +35,9 @@ public:
           std::function<void()> task;
           {
             std::unique_lock lock(ctx_ptr->mtx);
-            ctx_ptr->cv.wait(lock, st, [&]() -> bool {
-              return !ctx_ptr->local_queue.empty();
-            });
-
-            if (ctx_ptr->local_queue.empty()) {
+            if (!ctx_ptr->cv.wait(lock, st, [&]() -> bool {
+                  return !ctx_ptr->local_queue.empty();
+                })) {
               break;
             }
 
@@ -61,7 +59,7 @@ public:
   }
 
   template <typename F, typename... Args>
-    requires std::invocable<F, Args...>
+    requires std::invocable<std::decay_t<F>, std::decay_t<Args>...>
   auto enqueue(F &&f, Args &&...args) -> std::future<
       std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>> {
     using return_type =
