@@ -8,12 +8,12 @@ platform(
 )
 
 platform(
-    name = "x86_linux_avx2_gcc13",
+    name = "x86_linux_avx2_gcc15",
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
         "//platforms/isa:avx2",
-        "//platforms/compiler_version:gcc13",
+        "//platforms/compiler_version:gcc15",
     ],
     flags = [
         "--@rules_cuda//cuda:enable=False",

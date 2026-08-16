@@ -67,7 +67,7 @@ def _translate_compiler(rctx):
         gcc_version = gcc_version.split(".")[0]
 
         # Only the gcc version defined in the aqinfer platform is processed.
-        if gcc_version == "13":
+        if gcc_version == "13" or gcc_version == "15":
             return "gcc%s" % gcc_version
     return None
 

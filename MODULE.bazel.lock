@@ -179,7 +179,7 @@
   "moduleExtensions": {
     "//:tools/gen_platforms.bzl%host_platform": {
       "general": {
-        "bzlTransitiveDigest": "qHX6xJ2OpGZd+Zdfdm2ZWxc1g4HQwyJqPMdRl5EQ8rM=",
+        "bzlTransitiveDigest": "R363VVrlsKB/rhWK5EK2PJXAJUSJbnAeTT0srn9tSKk=",
         "usagesDigest": "5j+97RGJH6W5Z6VMGRuATAE+eG2DmOSMD+mChKK1D2s=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
