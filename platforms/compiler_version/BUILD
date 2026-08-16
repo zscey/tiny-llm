@@ -6,3 +6,8 @@ constraint_value(
     name = "gcc13",
     constraint_setting = ":compiler_version",
 )
+
+constraint_value(
+    name = "gcc15",
+    constraint_setting = ":compiler_version",
+)

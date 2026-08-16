@@ -26,7 +26,7 @@ TEST(ThreadPool, ThreadPool) {
   }
 
   for (size_t i = 0; i < 10; ++i) {
-    EXPECT_TRUE(futures.at(i).get() == (i * 200 + 99) * 50);
+    EXPECT_TRUE(futures.at(i).get() == ((i * 200) + 99) * 50);
   }
 }
 } // namespace tiny_llm
